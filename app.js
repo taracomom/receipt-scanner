@@ -276,9 +276,12 @@ class ReceiptScanner {
             let accessToken = localStorage.getItem('google_access_token');
             
             if (!accessToken) {
-                // Initiate OAuth flow
-                await this.authenticateWithGoogle();
-                accessToken = localStorage.getItem('google_access_token');
+                // Show error message instead of trying to authenticate
+                this.hideProcessingModal();
+                alert('Google Drive連携が設定されていません。\n\nセットアップ手順:\n1. Google Cloud Consoleでプロジェクト作成\n2. Drive API有効化\n3. OAuth設定\n4. config.jsにクライアントID設定');
+                this.captureBtn.disabled = false;
+                this.status.textContent = 'レシートを撮影してください';
+                return;
             }
             
             // Create multipart upload request
