@@ -206,12 +206,14 @@
                 }
 
                 // Use OAuth 2.0 flow for getting access token
+                const currentUrl = window.location.href.split('#')[0].split('?')[0];
                 const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
                     `client_id=${clientId}&` +
                     `response_type=token&` +
                     `scope=${encodeURIComponent(SCOPES)}&` +
-                    `redirect_uri=${encodeURIComponent(window.location.origin + window.location.pathname)}`;
+                    `redirect_uri=${encodeURIComponent(currentUrl)}`;
 
+                console.log('Auth URL:', authUrl);
                 window.location.href = authUrl;
 
             } catch (error) {
@@ -354,40 +356,103 @@
                 document.getElementById('status').textContent = 'Google Driveにアップロード中...';
                 
                 // Convert base64 to blob
-                const response = await fetch(capturedImage);
-                const blob = await response.blob();
+                const base64Data = capturedImage.split(',')[1];
+                const byteCharacters = atob(base64Data);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], {type: 'image/jpeg'});
 
-                // Create form data for multipart upload
+                // Step 1: Create file metadata
                 const metadata = {
-                    name: filename,
-                    parents: [''] // Root folder
+                    name: filename
                 };
 
-                const formData = new FormData();
-                formData.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
-                formData.append('file', blob);
-
-                const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                const metadataResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${accessToken}`
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
                     },
-                    body: formData
+                    body: JSON.stringify(metadata)
+                });
+
+                if (!metadataResponse.ok) {
+                    throw new Error(`Metadata creation failed: ${metadataResponse.status} ${metadataResponse.statusText}`);
+                }
+
+                const fileInfo = await metadataResponse.json();
+
+                // Step 2: Upload file content
+                const uploadResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileInfo.id}?uploadType=media`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'image/jpeg'
+                    },
+                    body: blob
                 });
 
                 if (uploadResponse.ok) {
-                    const result = await uploadResponse.json();
-                    showResult(`☁️ Google Drive保存完了<br>ファイル名: ${filename}<br>ファイルID: ${result.id}`, 'success');
+                    showResult(`☁️ Google Drive保存完了<br>ファイル名: ${filename}<br>ファイルID: ${fileInfo.id}`, 'success');
                     
                     // Also save locally as backup
                     saveDataLocal();
                 } else {
-                    throw new Error(`Upload failed: ${uploadResponse.status}`);
+                    throw new Error(`Upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
                 }
 
             } catch (error) {
                 console.error('Drive upload error:', error);
-                showResult(`❌ Google Drive保存に失敗<br>エラー: ${error.message}`, 'danger');
+                
+                // Fallback: try simple upload method
+                try {
+                    await simpleUpload(filename, capturedImage);
+                } catch (fallbackError) {
+                    showResult(`❌ Google Drive保存に失敗<br>エラー: ${error.message}<br>フォールバック失敗: ${fallbackError.message}`, 'danger');
+                }
+            }
+        }
+
+        // Fallback simple upload method
+        async function simpleUpload(filename, imageData) {
+            const base64Data = imageData.split(',')[1];
+            
+            const boundary = '-------314159265358979323846';
+            const delimiter = `\r\n--${boundary}\r\n`;
+            const close_delim = `\r\n--${boundary}--`;
+
+            const metadata = {
+                'name': filename
+            };
+
+            const multipartRequestBody =
+                delimiter +
+                'Content-Type: application/json\r\n\r\n' +
+                JSON.stringify(metadata) +
+                delimiter +
+                'Content-Type: image/jpeg\r\n' +
+                'Content-Transfer-Encoding: base64\r\n\r\n' +
+                base64Data +
+                close_delim;
+
+            const request = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': `multipart/related; boundary="${boundary}"`
+                },
+                body: multipartRequestBody
+            });
+
+            if (request.ok) {
+                const result = await request.json();
+                showResult(`☁️ Google Drive保存完了（フォールバック）<br>ファイル名: ${filename}<br>ファイルID: ${result.id}`, 'success');
+                saveDataLocal();
+            } else {
+                throw new Error(`Fallback upload failed: ${request.status}`);
             }
         }
 
