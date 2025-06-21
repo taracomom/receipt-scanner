@@ -1,8 +1,8 @@
 // Configuration file for API keys
 // In production, these should be set via environment variables or secure configuration
 const CONFIG = {
-    OPENAI_API_KEY: 'sk-proj-paste-your-actual-openai-key-here',
-    GOOGLE_CLIENT_ID: 'paste-your-actual-google-client-id-here.apps.googleusercontent.com'
+    OPENAI_API_KEY: 'sk-proj-your-real-openai-key-here',
+    GOOGLE_CLIENT_ID: 'your-real-google-client-id.apps.googleusercontent.com'
 };
 
 // For development, you can override these values here

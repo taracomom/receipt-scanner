@@ -32,11 +32,14 @@ class ReceiptScanner {
     
     async initializeCamera() {
         try {
+            console.log('カメラ初期化開始...');
+            this.status.textContent = 'カメラを初期化中...';
+            
             const constraints = {
                 video: {
                     facingMode: { ideal: 'environment' },
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 }
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
                 }
             };
             
@@ -44,16 +47,61 @@ class ReceiptScanner {
             this.video.srcObject = stream;
             
             this.video.addEventListener('loadedmetadata', () => {
+                console.log('カメラメタデータ読み込み完了');
                 this.setupCanvas();
                 this.captureBtn.disabled = false;
                 this.status.textContent = 'レシートを撮影してください';
             });
             
+            this.video.addEventListener('error', (e) => {
+                console.error('Video error:', e);
+                this.status.textContent = 'カメラエラーが発生しました';
+            });
+            
         } catch (error) {
             console.error('Camera access failed:', error);
-            this.status.textContent = 'カメラにアクセスできません';
+            this.status.textContent = `カメラエラー: ${error.message}`;
             this.captureBtn.disabled = true;
+            
+            // フォールバック: ファイル入力を表示
+            this.showFileInput();
         }
+    }
+    
+    showFileInput() {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.capture = 'environment';
+        fileInput.className = 'w-full p-4 bg-blue-500 text-white rounded-lg mt-4';
+        fileInput.style.display = 'block';
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.currentImageBlob = this.dataURLToBlob(e.target.result);
+                    this.showProcessingModal();
+                    this.processWithOpenAI();
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        this.video.parentElement.appendChild(fileInput);
+    }
+    
+    dataURLToBlob(dataURL) {
+        const arr = dataURL.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new Blob([u8arr], { type: mime });
     }
     
     setupCanvas() {
@@ -76,14 +124,8 @@ class ReceiptScanner {
     }
     
     async setupServiceWorker() {
-        if ('serviceWorker' in navigator) {
-            try {
-                await navigator.serviceWorker.register('/sw.js');
-                console.log('Service Worker registered');
-            } catch (error) {
-                console.error('Service Worker registration failed:', error);
-            }
-        }
+        // Service Worker disabled for debugging
+        console.log('Service Worker disabled for debugging');
     }
     
     checkGoogleAuth() {
