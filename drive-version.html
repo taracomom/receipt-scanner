@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt Scanner - Google Drive版</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#007bff">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: sans-serif; background: #f5f5f5; padding: 10px; }
+        .container { max-width: 400px; margin: 0 auto; background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .camera-section { background: black; border-radius: 10px; margin-bottom: 20px; height: 250px; display: flex; align-items: center; justify-content: center; }
+        video { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin: 10px 0; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .form-group { margin: 10px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        .alert { padding: 10px; border-radius: 5px; margin: 10px 0; }
+        .alert-success { background: #d4edda; color: #155724; }
+        .alert-warning { background: #fff3cd; color: #856404; }
+        .alert-danger { background: #f8d7da; color: #721c24; }
+        .hidden { display: none; }
+        .drive-status { padding: 10px; background: #e3f2fd; border-radius: 5px; margin: 10px 0; }
+        .drive-connected { background: #e8f5e8; color: #2e7d32; }
+        .drive-disconnected { background: #ffebee; color: #c62828; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Receipt Scanner</h1>
+        <p>Google Drive連携版</p>
+
+        <!-- Google Drive Status -->
+        <div id="drive-status" class="drive-status drive-disconnected">
+            <strong>Google Drive: 未接続</strong>
+            <button id="connect-btn" class="btn btn-primary" style="margin-top: 10px;">🔗 Google Drive接続</button>
+        </div>
+
+        <!-- Settings -->
+        <div id="settings-section">
+            <h3>設定</h3>
+            <div class="form-group">
+                <label>Google Client ID</label>
+                <input type="text" id="google-client-id" placeholder="123456789-abcdefg.apps.googleusercontent.com">
+                <button class="btn btn-primary" onclick="saveClientId()">保存</button>
+            </div>
+        </div>
+
+        <!-- Camera Section -->
+        <div class="camera-section">
+            <video id="video" autoplay playsinline muted></video>
+            <canvas id="canvas" class="hidden"></canvas>
+        </div>
+
+        <!-- File Input (fallback) -->
+        <input type="file" id="file-input" accept="image/*" capture="environment" class="btn btn-primary" style="display: none;">
+
+        <!-- Capture Button -->
+        <button id="capture-btn" class="btn btn-primary" disabled>📷 撮影</button>
+
+        <!-- Form -->
+        <div id="form-section" class="hidden">
+            <h3>レシート情報</h3>
+            <div class="form-group">
+                <label>日付</label>
+                <input type="date" id="date" value="2025-06-21">
+            </div>
+            <div class="form-group">
+                <label>会社名</label>
+                <input type="text" id="company" placeholder="例: ファミリーマート">
+            </div>
+            <div class="form-group">
+                <label>品名</label>
+                <input type="text" id="item" placeholder="例: コーヒー">
+            </div>
+            <div class="form-group">
+                <label>価格</label>
+                <input type="number" id="price" placeholder="例: 150">
+            </div>
+            <button id="save-local-btn" class="btn btn-success">💾 ローカル保存</button>
+            <button id="save-drive-btn" class="btn btn-primary" disabled>☁️ Google Drive保存</button>
+        </div>
+
+        <!-- Results -->
+        <div id="results"></div>
+        <div id="status" class="alert alert-warning">初期化中...</div>
+    </div>
+
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+
+    <script>
+        let video, canvas, capturedImage;
+        let cameraAvailable = false;
+        let driveConnected = false;
+        let accessToken = null;
+
+        // Configuration
+        const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+        async function init() {
+            video = document.getElementById('video');
+            canvas = document.getElementById('canvas');
+            
+            // Load saved client ID
+            const savedClientId = localStorage.getItem('google_client_id');
+            if (savedClientId) {
+                document.getElementById('google-client-id').value = savedClientId;
+                await initializeGoogleAuth(savedClientId);
+            }
+
+            // Initialize camera
+            await initCamera();
+        }
+
+        async function initCamera() {
+            const status = document.getElementById('status');
+            
+            try {
+                status.textContent = 'カメラを初期化中...';
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                
+                video.srcObject = stream;
+                cameraAvailable = true;
+                
+                video.onloadedmetadata = () => {
+                    document.getElementById('capture-btn').disabled = false;
+                    status.textContent = 'レシートを撮影してください';
+                    status.className = 'alert alert-success';
+                };
+                
+            } catch (error) {
+                console.error('Camera error:', error);
+                cameraAvailable = false;
+                
+                document.getElementById('file-input').style.display = 'block';
+                document.getElementById('capture-btn').style.display = 'none';
+                video.style.display = 'none';
+                
+                status.textContent = 'カメラを利用できません。ファイルを選択してください';
+                status.className = 'alert alert-warning';
+            }
+        }
+
+        async function saveClientId() {
+            const clientId = document.getElementById('google-client-id').value.trim();
+            if (!clientId) {
+                alert('クライアントIDを入力してください');
+                return;
+            }
+
+            localStorage.setItem('google_client_id', clientId);
+            await initializeGoogleAuth(clientId);
+            alert('クライアントIDを保存しました');
+        }
+
+        async function initializeGoogleAuth(clientId) {
+            try {
+                // Initialize gapi
+                await new Promise((resolve) => {
+                    gapi.load('client', resolve);
+                });
+                
+                await gapi.client.init({
+                    discoveryDocs: [DISCOVERY_DOC],
+                });
+
+                // Initialize Google Identity Services
+                google.accounts.id.initialize({
+                    client_id: clientId,
+                    callback: handleCredentialResponse
+                });
+
+                console.log('Google Auth initialized');
+            } catch (error) {
+                console.error('Google Auth initialization failed:', error);
+            }
+        }
+
+        function handleCredentialResponse(response) {
+            console.log('Credential response:', response);
+            // For file upload, we need access token, not ID token
+            // This is a simplified implementation
+        }
+
+        async function connectGoogleDrive() {
+            try {
+                const clientId = localStorage.getItem('google_client_id');
+                if (!clientId) {
+                    alert('まずクライアントIDを設定してください');
+                    return;
+                }
+
+                // Use OAuth 2.0 flow for getting access token
+                const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+                    `client_id=${clientId}&` +
+                    `response_type=token&` +
+                    `scope=${encodeURIComponent(SCOPES)}&` +
+                    `redirect_uri=${encodeURIComponent(window.location.origin + window.location.pathname)}`;
+
+                window.location.href = authUrl;
+
+            } catch (error) {
+                console.error('Google Drive connection failed:', error);
+                updateDriveStatus(false, 'Google Drive接続に失敗しました');
+            }
+        }
+
+        function updateDriveStatus(connected, message = '') {
+            driveConnected = connected;
+            const statusEl = document.getElementById('drive-status');
+            const connectBtn = document.getElementById('connect-btn');
+            const saveDriveBtn = document.getElementById('save-drive-btn');
+
+            if (connected) {
+                statusEl.className = 'drive-status drive-connected';
+                statusEl.innerHTML = '<strong>Google Drive: 接続済み</strong>' + 
+                    (message ? `<br><small>${message}</small>` : '');
+                connectBtn.textContent = '🔓 切断';
+                connectBtn.onclick = disconnectGoogleDrive;
+                saveDriveBtn.disabled = false;
+            } else {
+                statusEl.className = 'drive-status drive-disconnected';
+                statusEl.innerHTML = '<strong>Google Drive: 未接続</strong>' +
+                    (message ? `<br><small style="color: #c62828;">${message}</small>` : '');
+                connectBtn.textContent = '🔗 Google Drive接続';
+                connectBtn.onclick = connectGoogleDrive;
+                saveDriveBtn.disabled = true;
+            }
+        }
+
+        function disconnectGoogleDrive() {
+            accessToken = null;
+            localStorage.removeItem('google_access_token');
+            updateDriveStatus(false);
+        }
+
+        // Check for OAuth callback
+        function checkOAuthCallback() {
+            const hash = window.location.hash;
+            if (hash.includes('access_token=')) {
+                const params = new URLSearchParams(hash.substring(1));
+                accessToken = params.get('access_token');
+                
+                if (accessToken) {
+                    localStorage.setItem('google_access_token', accessToken);
+                    updateDriveStatus(true, 'アクセストークン取得成功');
+                    
+                    // Clean URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            } else {
+                // Check saved token
+                const savedToken = localStorage.getItem('google_access_token');
+                if (savedToken) {
+                    accessToken = savedToken;
+                    updateDriveStatus(true, '保存されたトークンを使用');
+                }
+            }
+        }
+
+        function capturePhoto() {
+            if (!cameraAvailable) return;
+            
+            const ctx = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            
+            capturedImage = canvas.toDataURL('image/jpeg', 0.8);
+            showForm();
+        }
+
+        function handleFileInput(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    capturedImage = canvas.toDataURL('image/jpeg', 0.8);
+                    showForm();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function showForm() {
+            document.getElementById('form-section').classList.remove('hidden');
+            
+            // Sample data
+            document.getElementById('company').value = 'サンプルストア';
+            document.getElementById('item').value = 'コーヒー';
+            document.getElementById('price').value = '150';
+            
+            document.getElementById('status').textContent = '情報を確認して保存方法を選択してください';
+        }
+
+        function saveDataLocal() {
+            const data = {
+                date: document.getElementById('date').value,
+                company: document.getElementById('company').value,
+                item: document.getElementById('item').value,
+                price: document.getElementById('price').value,
+                timestamp: new Date().toISOString(),
+                image: capturedImage
+            };
+            
+            const receipts = JSON.parse(localStorage.getItem('receipts') || '[]');
+            receipts.push(data);
+            localStorage.setItem('receipts', JSON.stringify(receipts));
+            
+            const filename = `${data.date}_${data.company}_${data.item}_${data.price}.jpg`;
+            
+            showResult(`💾 ローカル保存完了<br>ファイル名: ${filename}`, 'success');
+        }
+
+        async function saveDataDrive() {
+            if (!accessToken) {
+                alert('Google Driveに接続してください');
+                return;
+            }
+
+            const data = {
+                date: document.getElementById('date').value,
+                company: document.getElementById('company').value,
+                item: document.getElementById('item').value,
+                price: document.getElementById('price').value
+            };
+
+            const filename = `${data.date}_${data.company}_${data.item}_${data.price}.jpg`;
+
+            try {
+                document.getElementById('status').textContent = 'Google Driveにアップロード中...';
+                
+                // Convert base64 to blob
+                const response = await fetch(capturedImage);
+                const blob = await response.blob();
+
+                // Create form data for multipart upload
+                const metadata = {
+                    name: filename,
+                    parents: [''] // Root folder
+                };
+
+                const formData = new FormData();
+                formData.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+                formData.append('file', blob);
+
+                const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    body: formData
+                });
+
+                if (uploadResponse.ok) {
+                    const result = await uploadResponse.json();
+                    showResult(`☁️ Google Drive保存完了<br>ファイル名: ${filename}<br>ファイルID: ${result.id}`, 'success');
+                    
+                    // Also save locally as backup
+                    saveDataLocal();
+                } else {
+                    throw new Error(`Upload failed: ${uploadResponse.status}`);
+                }
+
+            } catch (error) {
+                console.error('Drive upload error:', error);
+                showResult(`❌ Google Drive保存に失敗<br>エラー: ${error.message}`, 'danger');
+            }
+        }
+
+        function showResult(message, type) {
+            document.getElementById('results').innerHTML = `
+                <div class="alert alert-${type}">
+                    ${message}
+                </div>
+            `;
+            
+            document.getElementById('form-section').classList.add('hidden');
+            document.getElementById('status').textContent = 'レシートを撮影してください';
+        }
+
+        // Event listeners
+        document.getElementById('capture-btn').addEventListener('click', capturePhoto);
+        document.getElementById('file-input').addEventListener('change', handleFileInput);
+        document.getElementById('save-local-btn').addEventListener('click', saveDataLocal);
+        document.getElementById('save-drive-btn').addEventListener('click', saveDataDrive);
+        document.getElementById('connect-btn').addEventListener('click', connectGoogleDrive);
+
+        // Initialize
+        checkOAuthCallback();
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Drive連携設定</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .step { background: #f8f9fa; border-left: 4px solid #007bff; padding: 15px; margin: 15px 0; }
+        .code { background: #f1f1f1; padding: 10px; border-radius: 5px; font-family: monospace; }
+        .btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🔗 Google Drive連携設定手順</h1>
+    
+    <div class="step">
+        <h3>ステップ 1: Google Cloud Console</h3>
+        <ol>
+            <li><a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a> にアクセス</li>
+            <li>新しいプロジェクトを作成（名前: receipt-scanner）</li>
+            <li>プロジェクトを選択</li>
+        </ol>
+    </div>
+
+    <div class="step">
+        <h3>ステップ 2: Google Drive API有効化</h3>
+        <ol>
+            <li>左メニュー「APIs & Services」→「ライブラリ」</li>
+            <li>「Google Drive API」を検索</li>
+            <li>「有効にする」をクリック</li>
+        </ol>
+    </div>
+
+    <div class="step">
+        <h3>ステップ 3: OAuth認証情報作成</h3>
+        <ol>
+            <li>「APIs & Services」→「認証情報」</li>
+            <li>「認証情報を作成」→「OAuth 2.0 クライアント ID」</li>
+            <li>設定：
+                <ul>
+                    <li>アプリケーションの種類: <strong>ウェブアプリケーション</strong></li>
+                    <li>名前: Receipt Scanner</li>
+                    <li>承認済みのリダイレクト URI: 
+                        <div class="code">https://taracomom.github.io/receipt-scanner/</div>
+                    </li>
+                </ul>
+            </li>
+            <li>「作成」をクリック</li>
+        </ol>
+    </div>
+
+    <div class="step">
+        <h3>ステップ 4: クライアントID取得</h3>
+        <p>作成されたクライアントIDをコピー（例: <code>123456789-abcdefg.apps.googleusercontent.com</code>）</p>
+    </div>
+
+    <div class="step">
+        <h3>ステップ 5: テスト</h3>
+        <p>下記ボタンでクライアントIDをテスト：</p>
+        <input type="text" id="client-id" placeholder="クライアントIDを入力" style="width: 400px; padding: 8px;">
+        <button class="btn" onclick="testGoogleAuth()">テスト</button>
+        <div id="test-result"></div>
+    </div>
+
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <script>
+        function testGoogleAuth() {
+            const clientId = document.getElementById('client-id').value;
+            if (!clientId) {
+                alert('クライアントIDを入力してください');
+                return;
+            }
+
+            try {
+                google.accounts.id.initialize({
+                    client_id: clientId,
+                    callback: (response) => {
+                        document.getElementById('test-result').innerHTML = 
+                            '<div style="color: green; margin-top: 10px;">✅ Google認証成功！</div>';
+                        console.log('Google auth successful:', response);
+                    }
+                });
+
+                google.accounts.id.prompt();
+                
+            } catch (error) {
+                document.getElementById('test-result').innerHTML = 
+                    '<div style="color: red; margin-top: 10px;">❌ エラー: ' + error.message + '</div>';
+            }
+        }
+    </script>
+</body>
+</html>
