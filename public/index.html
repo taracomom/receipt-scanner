@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt Scanner</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        #video {
+            transform: scaleX(-1);
+        }
+        .loading {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen overflow-hidden">
+    <div id="app" class="h-full flex flex-col">
+        <!-- Camera View -->
+        <div id="camera-view" class="flex-1 relative bg-black">
+            <video id="video" class="w-full h-full object-cover" autoplay playsinline muted></video>
+            <canvas id="canvas" class="hidden"></canvas>
+            
+            <!-- Overlay UI -->
+            <div class="absolute inset-0 flex flex-col justify-between p-4">
+                <!-- Status bar -->
+                <div class="text-white text-center">
+                    <div id="status" class="bg-black bg-opacity-50 px-4 py-2 rounded-lg">
+                        カメラを起動中...
+                    </div>
+                </div>
+                
+                <!-- Capture button -->
+                <div class="flex justify-center">
+                    <button id="capture-btn" 
+                            class="w-20 h-20 bg-white rounded-full border-4 border-gray-300 shadow-lg disabled:opacity-50"
+                            disabled>
+                        <div class="w-16 h-16 bg-white rounded-full mx-auto"></div>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Processing Modal -->
+        <div id="processing-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 m-4 max-w-sm w-full text-center">
+                <div class="loading w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                <div id="processing-text">レシートを解析中...</div>
+            </div>
+        </div>
+        
+        <!-- Edit Modal -->
+        <div id="edit-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 m-4 max-w-sm w-full">
+                <h3 class="text-lg font-semibold mb-4">レシート情報を確認</h3>
+                <form id="receipt-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">日付</label>
+                        <input type="date" id="date-input" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">会社名</label>
+                        <input type="text" id="company-input" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">品名</label>
+                        <input type="text" id="item-input" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">価格</label>
+                        <input type="number" id="price-input" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div class="flex space-x-3">
+                        <button type="button" id="cancel-btn" class="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md">
+                            キャンセル
+                        </button>
+                        <button type="submit" id="save-btn" class="flex-1 bg-blue-500 text-white py-2 px-4 rounded-md">
+                            保存
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Success Modal -->
+        <div id="success-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 m-4 max-w-sm w-full text-center">
+                <div class="text-green-500 text-5xl mb-4">✓</div>
+                <div class="text-lg font-semibold mb-2">保存完了</div>
+                <div id="success-text" class="text-gray-600 mb-4"></div>
+                <button id="continue-btn" class="bg-blue-500 text-white py-2 px-4 rounded-md w-full">
+                    続行
+                </button>
+            </div>
+        </div>
+        
+        <!-- Settings -->
+        <div id="settings-btn" class="fixed top-4 right-4 z-40">
+            <button class="bg-black bg-opacity-50 text-white p-2 rounded-full">
+                ⚙️
+            </button>
+        </div>
+    </div>
+
+    <script src="config.js?v=1"></script>
+    <script src="app.js?v=1"></script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt Scanner - Test Version</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 h-screen">
+    <div class="container mx-auto p-4">
+        <h1 class="text-2xl font-bold mb-4">📱 Receipt Scanner テスト版</h1>
+        
+        <!-- Camera Section -->
+        <div class="bg-black rounded-lg mb-4" style="height: 300px;">
+            <video id="video" class="w-full h-full object-cover rounded-lg" autoplay playsinline muted></video>
+            <canvas id="canvas" class="hidden"></canvas>
+        </div>
+        
+        <!-- Capture Button -->
+        <button id="capture-btn" class="w-full bg-blue-500 text-white py-4 rounded-lg text-lg font-semibold mb-4">
+            📷 撮影する
+        </button>
+        
+        <!-- Form -->
+        <div id="form-section" class="hidden">
+            <h2 class="text-lg font-semibold mb-3">レシート情報</h2>
+            <div class="space-y-3">
+                <input type="date" id="date" class="w-full p-3 border rounded-lg" value="2025-06-21">
+                <input type="text" id="company" class="w-full p-3 border rounded-lg" placeholder="会社名">
+                <input type="text" id="item" class="w-full p-3 border rounded-lg" placeholder="品名">
+                <input type="number" id="price" class="w-full p-3 border rounded-lg" placeholder="価格">
+                <button id="save-btn" class="w-full bg-green-500 text-white py-3 rounded-lg">
+                    💾 ローカル保存
+                </button>
+            </div>
+        </div>
+        
+        <!-- Results -->
+        <div id="results" class="mt-4"></div>
+    </div>
+
+    <script>
+        let video, canvas, capturedImage;
+
+        async function initCamera() {
+            try {
+                video = document.getElementById('video');
+                canvas = document.getElementById('canvas');
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }
+                });
+                video.srcObject = stream;
+                
+                document.getElementById('capture-btn').disabled = false;
+                console.log('カメラ初期化完了');
+            } catch (error) {
+                console.error('カメラエラー:', error);
+                alert('カメラにアクセスできません');
+            }
+        }
+
+        function capturePhoto() {
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0);
+            
+            capturedImage = canvas.toDataURL('image/jpeg', 0.8);
+            
+            // フォーム表示
+            document.getElementById('form-section').classList.remove('hidden');
+            
+            // ダミーデータ設定（OCRの代わり）
+            document.getElementById('company').value = 'サンプルストア';
+            document.getElementById('item').value = 'コーヒー';
+            document.getElementById('price').value = '150';
+            
+            console.log('撮影完了');
+        }
+
+        function saveData() {
+            const data = {
+                date: document.getElementById('date').value,
+                company: document.getElementById('company').value,
+                item: document.getElementById('item').value,
+                price: document.getElementById('price').value,
+                image: capturedImage
+            };
+            
+            // ローカルストレージに保存
+            const saved = JSON.parse(localStorage.getItem('receipts') || '[]');
+            saved.push(data);
+            localStorage.setItem('receipts', JSON.stringify(saved));
+            
+            // 結果表示
+            const filename = `${data.date}_${data.company}_${data.item}_${data.price}.jpg`;
+            document.getElementById('results').innerHTML = `
+                <div class="bg-green-100 p-4 rounded-lg">
+                    <h3 class="font-semibold text-green-800">✅ 保存完了</h3>
+                    <p class="text-green-700">ファイル名: ${filename}</p>
+                    <p class="text-sm text-gray-600 mt-2">ローカルストレージに保存されました</p>
+                </div>
+            `;
+            
+            // フォームリセット
+            document.getElementById('form-section').classList.add('hidden');
+            
+            console.log('データ保存完了:', filename);
+        }
+
+        // イベントリスナー
+        document.getElementById('capture-btn').addEventListener('click', capturePhoto);
+        document.getElementById('save-btn').addEventListener('click', saveData);
+
+        // 初期化
+        initCamera();
+    </script>
+</body>
+</html>
