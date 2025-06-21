@@ -1,0 +1,13 @@
+{
+  "name": "receipt-scanner",
+  "version": "1.0.0",
+  "description": "PWA for scanning receipts and uploading to Google Drive",
+  "main": "src/app.js",
+  "scripts": {
+    "dev": "python3 -m http.server 8000 --directory public",
+    "start": "python3 -m http.server 8080 --directory public"
+  },
+  "keywords": ["pwa", "receipt", "scanner", "google-drive", "openai"],
+  "author": "",
+  "license": "MIT"
+}
