@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt Scanner - 完全版</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#007bff">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: sans-serif; background: #f5f5f5; padding: 10px; }
+        .container { max-width: 400px; margin: 0 auto; background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .camera-section { background: black; border-radius: 10px; margin-bottom: 20px; height: 250px; display: flex; align-items: center; justify-content: center; }
+        video { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin: 10px 0; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .form-group { margin: 10px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        .alert { padding: 10px; border-radius: 5px; margin: 10px 0; }
+        .alert-success { background: #d4edda; color: #155724; }
+        .alert-warning { background: #fff3cd; color: #856404; }
+        .alert-danger { background: #f8d7da; color: #721c24; }
+        .hidden { display: none; }
+        .status-item { padding: 8px; margin: 5px 0; border-radius: 5px; font-size: 14px; }
+        .status-connected { background: #e8f5e8; color: #2e7d32; }
+        .status-disconnected { background: #ffebee; color: #c62828; }
+        .loading { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: white; padding: 20px; border-radius: 10px; max-width: 300px; text-align: center; }
+        .tabs { display: flex; margin-bottom: 15px; }
+        .tab { flex: 1; padding: 10px; background: #f0f0f0; border: none; cursor: pointer; }
+        .tab.active { background: #007bff; color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Receipt Scanner</h1>
+        <p>AI OCR + Google Drive 完全版</p>
+
+        <!-- Status Overview -->
+        <div id="status-overview">
+            <div id="openai-status" class="status-item status-disconnected">
+                <strong>🤖 OpenAI API:</strong> 未設定
+            </div>
+            <div id="drive-status" class="status-item status-disconnected">
+                <strong>☁️ Google Drive:</strong> 未接続
+            </div>
+        </div>
+
+        <!-- Settings Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('openai')">OpenAI</button>
+            <button class="tab" onclick="showTab('drive')">Drive</button>
+        </div>
+
+        <div id="openai-tab" class="tab-content active">
+            <h3>OpenAI API設定</h3>
+            <div class="form-group">
+                <label>API Key</label>
+                <input type="password" id="openai-api-key" placeholder="sk-proj-...">
+                <button class="btn btn-primary" onclick="saveOpenAIKey()">保存</button>
+            </div>
+        </div>
+
+        <div id="drive-tab" class="tab-content">
+            <h3>Google Drive設定</h3>
+            <div class="form-group">
+                <label>Google Client ID</label>
+                <input type="text" id="google-client-id" placeholder="123456789-abcd.apps.googleusercontent.com" value="255333114465-961rhoiiscu1iu72f1m5blege4ks9ijk.apps.googleusercontent.com">
+                <button class="btn btn-primary" onclick="saveClientId()">保存</button>
+            </div>
+            <button id="connect-drive-btn" class="btn btn-primary" onclick="connectGoogleDrive()">🔗 Google Drive接続</button>
+        </div>
+
+        <!-- Camera Section -->
+        <div class="camera-section">
+            <video id="video" autoplay playsinline muted></video>
+            <canvas id="canvas" class="hidden"></canvas>
+        </div>
+
+        <!-- File Input (fallback) -->
+        <input type="file" id="file-input" accept="image/*" capture="environment" class="btn btn-primary" style="display: none;">
+
+        <!-- Main Action Button -->
+        <button id="capture-btn" class="btn btn-primary" disabled>📷 撮影してAI解析</button>
+
+        <!-- Form -->
+        <div id="form-section" class="hidden">
+            <h3>レシート情報</h3>
+            <div id="ai-result-indicator" class="alert alert-success hidden">
+                🤖 AI解析結果（修正可能）
+            </div>
+            <div class="form-group">
+                <label>日付</label>
+                <input type="date" id="date">
+            </div>
+            <div class="form-group">
+                <label>会社名</label>
+                <input type="text" id="company">
+            </div>
+            <div class="form-group">
+                <label>品名</label>
+                <input type="text" id="item">
+            </div>
+            <div class="form-group">
+                <label>価格</label>
+                <input type="number" id="price">
+            </div>
+            
+            <!-- Save Options -->
+            <button id="save-local-btn" class="btn btn-success">💾 ローカル保存</button>
+            <button id="save-drive-btn" class="btn btn-primary" disabled>☁️ Google Drive保存</button>
+            <button id="retry-ai-btn" class="btn btn-warning">🔄 AI再解析</button>
+        </div>
+
+        <!-- Processing Modal -->
+        <div id="processing-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="loading" style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; margin: 0 auto 15px;"></div>
+                <div id="processing-text">処理中...</div>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div id="results"></div>
+        <div id="status" class="alert alert-warning">初期化中...</div>
+    </div>
+
+    <!-- Google APIs -->
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+
+    <script>
+        let video, canvas, capturedImage;
+        let cameraAvailable = false;
+        let openaiConfigured = false;
+        let driveConnected = false;
+        let accessToken = null;
+
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+        async function init() {
+            video = document.getElementById('video');
+            canvas = document.getElementById('canvas');
+            
+            // Load saved settings
+            const savedOpenAIKey = localStorage.getItem('openai_api_key');
+            const savedClientId = localStorage.getItem('google_client_id');
+            const savedAccessToken = localStorage.getItem('google_access_token');
+            
+            if (savedOpenAIKey) {
+                document.getElementById('openai-api-key').value = savedOpenAIKey;
+                updateOpenAIStatus(true);
+            }
+            
+            if (savedClientId) {
+                document.getElementById('google-client-id').value = savedClientId;
+            }
+            
+            if (savedAccessToken) {
+                accessToken = savedAccessToken;
+                updateDriveStatus(true);
+            }
+
+            // Check OAuth callback
+            checkOAuthCallback();
+            
+            // Initialize camera
+            await initCamera();
+        }
+
+        async function initCamera() {
+            const status = document.getElementById('status');
+            
+            try {
+                status.textContent = 'カメラを初期化中...';
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                
+                video.srcObject = stream;
+                cameraAvailable = true;
+                
+                video.onloadedmetadata = () => {
+                    document.getElementById('capture-btn').disabled = false;
+                    updateMainStatus();
+                };
+                
+            } catch (error) {
+                console.error('Camera error:', error);
+                cameraAvailable = false;
+                
+                document.getElementById('file-input').style.display = 'block';
+                document.getElementById('capture-btn').style.display = 'none';
+                video.style.display = 'none';
+                
+                status.textContent = 'カメラを利用できません。ファイルを選択してください';
+                status.className = 'alert alert-warning';
+            }
+        }
+
+        function showTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelector(`button[onclick="showTab('${tabName}')"]`).classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+        }
+
+        function saveOpenAIKey() {
+            const apiKey = document.getElementById('openai-api-key').value.trim();
+            if (!apiKey) {
+                alert('OpenAI API キーを入力してください');
+                return;
+            }
+
+            if (!apiKey.startsWith('sk-')) {
+                alert('正しいOpenAI API キー形式ではありません（sk-で始まる必要があります）');
+                return;
+            }
+
+            localStorage.setItem('openai_api_key', apiKey);
+            updateOpenAIStatus(true);
+            updateMainStatus();
+            alert('OpenAI API キーを保存しました');
+        }
+
+        function saveClientId() {
+            const clientId = document.getElementById('google-client-id').value.trim();
+            if (!clientId) {
+                alert('Google Client IDを入力してください');
+                return;
+            }
+
+            localStorage.setItem('google_client_id', clientId);
+            alert('Google Client IDを保存しました');
+        }
+
+        async function connectGoogleDrive() {
+            const clientId = localStorage.getItem('google_client_id');
+            if (!clientId) {
+                alert('まずGoogle Client IDを設定してください');
+                return;
+            }
+
+            const currentUrl = window.location.href.split('#')[0].split('?')[0];
+            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+                `client_id=${clientId}&` +
+                `response_type=token&` +
+                `scope=${encodeURIComponent(SCOPES)}&` +
+                `redirect_uri=${encodeURIComponent(currentUrl)}`;
+
+            window.location.href = authUrl;
+        }
+
+        function checkOAuthCallback() {
+            const hash = window.location.hash;
+            if (hash.includes('access_token=')) {
+                const params = new URLSearchParams(hash.substring(1));
+                accessToken = params.get('access_token');
+                
+                if (accessToken) {
+                    localStorage.setItem('google_access_token', accessToken);
+                    updateDriveStatus(true);
+                    
+                    // Clean URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            }
+        }
+
+        function updateOpenAIStatus(configured) {
+            openaiConfigured = configured;
+            const statusEl = document.getElementById('openai-status');
+            
+            if (configured) {
+                statusEl.className = 'status-item status-connected';
+                statusEl.innerHTML = '<strong>🤖 OpenAI API:</strong> 設定済み';
+            } else {
+                statusEl.className = 'status-item status-disconnected';
+                statusEl.innerHTML = '<strong>🤖 OpenAI API:</strong> 未設定';
+            }
+        }
+
+        function updateDriveStatus(connected) {
+            driveConnected = connected;
+            const statusEl = document.getElementById('drive-status');
+            const saveDriveBtn = document.getElementById('save-drive-btn');
+            const connectBtn = document.getElementById('connect-drive-btn');
+            
+            if (connected) {
+                statusEl.className = 'status-item status-connected';
+                statusEl.innerHTML = '<strong>☁️ Google Drive:</strong> 接続済み';
+                connectBtn.textContent = '🔓 切断';
+                connectBtn.onclick = disconnectGoogleDrive;
+                saveDriveBtn.disabled = false;
+            } else {
+                statusEl.className = 'status-item status-disconnected';
+                statusEl.innerHTML = '<strong>☁️ Google Drive:</strong> 未接続';
+                connectBtn.textContent = '🔗 Google Drive接続';
+                connectBtn.onclick = connectGoogleDrive;
+                saveDriveBtn.disabled = true;
+            }
+        }
+
+        function disconnectGoogleDrive() {
+            accessToken = null;
+            localStorage.removeItem('google_access_token');
+            updateDriveStatus(false);
+        }
+
+        function updateMainStatus() {
+            const status = document.getElementById('status');
+            
+            if (openaiConfigured) {
+                status.textContent = 'レシートを撮影してAI解析してください';
+                status.className = 'alert alert-success';
+            } else {
+                status.textContent = '撮影可能（AI解析にはOpenAI API設定が必要）';
+                status.className = 'alert alert-warning';
+            }
+        }
+
+        function capturePhoto() {
+            if (!cameraAvailable) return;
+            
+            const ctx = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            
+            capturedImage = canvas.toDataURL('image/jpeg', 0.8);
+            
+            if (openaiConfigured) {
+                processWithAI();
+            } else {
+                showManualForm();
+            }
+        }
+
+        function handleFileInput(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    capturedImage = canvas.toDataURL('image/jpeg', 0.8);
+                    
+                    if (openaiConfigured) {
+                        processWithAI();
+                    } else {
+                        showManualForm();
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function processWithAI() {
+            const apiKey = localStorage.getItem('openai_api_key');
+            
+            try {
+                showProcessingModal('AI でレシートを解析中...');
+                
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-4o-mini',
+                        max_tokens: 300,
+                        messages: [{
+                            role: 'user',
+                            content: [
+                                {
+                                    type: 'image_url',
+                                    image_url: { url: capturedImage }
+                                },
+                                {
+                                    type: 'text',
+                                    text: 'この画像はレシートです。以下の情報をJSONで抽出してください：\\n\\n1. 日付（YYYY-MM-DD形式）\\n2. 会社名\\n3. 品名（主要商品1つ）\\n4. 価格（合計金額、数字のみ）\\n\\n例：{"date":"2025-06-21","company":"ファミリーマート","item":"コーヒー","price":"150"}\\n\\nJSONのみを返答してください。'
+                                }
+                            ]
+                        }]
+                    })
+                });
+
+                hideProcessingModal();
+
+                if (!response.ok) {
+                    throw new Error(`OpenAI API error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const content = data.choices[0].message.content;
+
+                let receiptData;
+                try {
+                    receiptData = JSON.parse(content);
+                } catch (parseError) {
+                    const jsonMatch = content.match(/\\{[^{}]*\\}/);
+                    if (jsonMatch) {
+                        receiptData = JSON.parse(jsonMatch[0]);
+                    } else {
+                        throw new Error('AI応答からJSONを抽出できませんでした');
+                    }
+                }
+
+                showForm(receiptData, true);
+
+            } catch (error) {
+                console.error('AI processing failed:', error);
+                hideProcessingModal();
+                showManualForm();
+                showResult(`⚠️ AI解析に失敗しました: ${error.message}`, 'warning');
+            }
+        }
+
+        function showManualForm() {
+            showForm({
+                date: new Date().toISOString().split('T')[0],
+                company: '',
+                item: '',
+                price: ''
+            }, false);
+        }
+
+        function showForm(data, isAIResult) {
+            document.getElementById('date').value = data.date || '';
+            document.getElementById('company').value = data.company || '';
+            document.getElementById('item').value = data.item || '';
+            document.getElementById('price').value = data.price || '';
+            
+            const aiIndicator = document.getElementById('ai-result-indicator');
+            if (isAIResult) {
+                aiIndicator.classList.remove('hidden');
+            } else {
+                aiIndicator.classList.add('hidden');
+            }
+            
+            document.getElementById('form-section').classList.remove('hidden');
+            document.getElementById('status').textContent = '情報を確認して保存方法を選択してください';
+        }
+
+        function saveDataLocal() {
+            const data = {
+                date: document.getElementById('date').value,
+                company: document.getElementById('company').value,
+                item: document.getElementById('item').value,
+                price: document.getElementById('price').value,
+                timestamp: new Date().toISOString(),
+                image: capturedImage
+            };
+            
+            const receipts = JSON.parse(localStorage.getItem('receipts') || '[]');
+            receipts.push(data);
+            localStorage.setItem('receipts', JSON.stringify(receipts));
+            
+            const filename = `${data.date}_${data.company}_${data.item}_${data.price}.jpg`;
+            showResult(`💾 ローカル保存完了<br>ファイル名: ${filename}`, 'success');
+            resetForm();
+        }
+
+        async function saveDataDrive() {
+            if (!accessToken) {
+                alert('Google Driveに接続してください');
+                return;
+            }
+
+            const data = {
+                date: document.getElementById('date').value,
+                company: document.getElementById('company').value,
+                item: document.getElementById('item').value,
+                price: document.getElementById('price').value
+            };
+
+            const filename = `${data.date}_${data.company}_${data.item}_${data.price}.jpg`;
+
+            try {
+                showProcessingModal('Google Driveにアップロード中...');
+                
+                // Upload using multipart method
+                const base64Data = capturedImage.split(',')[1];
+                const boundary = '-------314159265358979323846';
+                const delimiter = `\\r\\n--${boundary}\\r\\n`;
+                const close_delim = `\\r\\n--${boundary}--`;
+
+                const metadata = { 'name': filename };
+                const multipartRequestBody =
+                    delimiter +
+                    'Content-Type: application/json\\r\\n\\r\\n' +
+                    JSON.stringify(metadata) +
+                    delimiter +
+                    'Content-Type: image/jpeg\\r\\n' +
+                    'Content-Transfer-Encoding: base64\\r\\n\\r\\n' +
+                    base64Data +
+                    close_delim;
+
+                const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': `multipart/related; boundary="${boundary}"`
+                    },
+                    body: multipartRequestBody
+                });
+
+                hideProcessingModal();
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showResult(`☁️ Google Drive保存完了<br>ファイル名: ${filename}<br>ファイルID: ${result.id}`, 'success');
+                    saveDataLocal(); // Also save locally as backup
+                    resetForm();
+                } else {
+                    throw new Error(`Upload failed: ${response.status}`);
+                }
+
+            } catch (error) {
+                hideProcessingModal();
+                console.error('Drive upload error:', error);
+                showResult(`❌ Google Drive保存に失敗: ${error.message}`, 'danger');
+            }
+        }
+
+        function retryAI() {
+            if (capturedImage) {
+                processWithAI();
+            } else {
+                alert('画像を再撮影してください');
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('form-section').classList.add('hidden');
+            updateMainStatus();
+        }
+
+        function showProcessingModal(text) {
+            document.getElementById('processing-text').textContent = text;
+            document.getElementById('processing-modal').classList.remove('hidden');
+        }
+
+        function hideProcessingModal() {
+            document.getElementById('processing-modal').classList.add('hidden');
+        }
+
+        function showResult(message, type) {
+            document.getElementById('results').innerHTML = `
+                <div class="alert alert-${type}">
+                    ${message}
+                </div>
+            `;
+        }
+
+        // Event listeners
+        document.getElementById('capture-btn').addEventListener('click', capturePhoto);
+        document.getElementById('file-input').addEventListener('change', handleFileInput);
+        document.getElementById('save-local-btn').addEventListener('click', saveDataLocal);
+        document.getElementById('save-drive-btn').addEventListener('click', saveDataDrive);
+        document.getElementById('retry-ai-btn').addEventListener('click', retryAI);
+
+        // Initialize
+        init();
+    </script>
+</body>
+</html>

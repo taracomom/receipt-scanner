@@ -221,12 +221,19 @@
         }
 
         async function processWithAI() {
-            if (!apiKeyConfigured) {
+            const apiKey = localStorage.getItem('openai_api_key');
+            
+            if (!apiKey || !apiKeyConfigured) {
                 alert('OpenAI API キーを設定してください');
+                // フォールバック: 手動入力フォーム
+                showForm({
+                    date: new Date().toISOString().split('T')[0],
+                    company: '',
+                    item: '',
+                    price: ''
+                });
                 return;
             }
-
-            const apiKey = localStorage.getItem('openai_api_key');
             
             try {
                 showProcessingModal();
