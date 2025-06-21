@@ -56,16 +56,64 @@
                 video = document.getElementById('video');
                 canvas = document.getElementById('canvas');
                 
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment' }
-                });
+                // より確実なカメラ設定
+                const constraints = {
+                    video: { 
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 1280, max: 1920 },
+                        height: { ideal: 720, max: 1080 }
+                    }
+                };
+                
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
                 
-                document.getElementById('capture-btn').disabled = false;
-                console.log('カメラ初期化完了');
+                video.onloadedmetadata = () => {
+                    console.log('カメラ初期化完了');
+                    document.getElementById('capture-btn').disabled = false;
+                };
+                
             } catch (error) {
                 console.error('カメラエラー:', error);
-                alert('カメラにアクセスできません');
+                
+                // フォールバック：ファイル入力
+                const fileInputHtml = `
+                    <div class="bg-yellow-100 p-4 rounded-lg mb-4">
+                        <p class="text-yellow-800 mb-2">カメラが利用できません。ファイルから選択してください：</p>
+                        <input type="file" id="file-input" accept="image/*" class="w-full p-2 border rounded">
+                    </div>
+                `;
+                document.querySelector('.container').insertAdjacentHTML('afterbegin', fileInputHtml);
+                
+                document.getElementById('file-input').addEventListener('change', handleFileInput);
+            }
+        }
+        
+        function handleFileInput(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // ファイルから画像を読み込み
+                    const img = new Image();
+                    img.onload = function() {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        capturedImage = canvas.toDataURL('image/jpeg', 0.8);
+                        
+                        // フォーム表示
+                        document.getElementById('form-section').classList.remove('hidden');
+                        document.getElementById('company').value = 'ファイルストア';
+                        document.getElementById('item').value = 'テスト商品';
+                        document.getElementById('price').value = '100';
+                        
+                        console.log('ファイル処理完了');
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
             }
         }
 

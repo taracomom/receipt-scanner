@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt Scanner - Simple Test</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#007bff">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: sans-serif; background: #f5f5f5; padding: 10px; }
+        .container { max-width: 400px; margin: 0 auto; background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .camera-section { background: black; border-radius: 10px; margin-bottom: 20px; height: 250px; display: flex; align-items: center; justify-content: center; }
+        video { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin: 10px 0; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .form-group { margin: 10px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        .alert { padding: 10px; border-radius: 5px; margin: 10px 0; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Receipt Scanner</h1>
+        <p>シンプルテスト版</p>
+
+        <!-- Camera Section -->
+        <div class="camera-section">
+            <video id="video" autoplay playsinline muted></video>
+            <canvas id="canvas" class="hidden"></canvas>
+        </div>
+
+        <!-- File Input (fallback) -->
+        <input type="file" id="file-input" accept="image/*" capture="environment" class="btn btn-primary" style="display: none;">
+
+        <!-- Capture Button -->
+        <button id="capture-btn" class="btn btn-primary" disabled>📷 撮影</button>
+
+        <!-- Form -->
+        <div id="form-section" class="hidden">
+            <h3>レシート情報</h3>
+            <div class="form-group">
+                <label>日付</label>
+                <input type="date" id="date" value="2025-06-21">
+            </div>
+            <div class="form-group">
+                <label>会社名</label>
+                <input type="text" id="company" placeholder="例: ファミリーマート">
+            </div>
+            <div class="form-group">
+                <label>品名</label>
+                <input type="text" id="item" placeholder="例: コーヒー">
+            </div>
+            <div class="form-group">
+                <label>価格</label>
+                <input type="number" id="price" placeholder="例: 150">
+            </div>
+            <button id="save-btn" class="btn btn-success">💾 保存</button>
+        </div>
+
+        <!-- Results -->
+        <div id="results"></div>
+
+        <!-- Status -->
+        <div id="status" class="alert alert-warning">初期化中...</div>
+    </div>
+
+    <script>
+        let video, canvas, capturedImage;
+        let cameraAvailable = false;
+
+        async function init() {
+            video = document.getElementById('video');
+            canvas = document.getElementById('canvas');
+            const status = document.getElementById('status');
+            
+            try {
+                status.textContent = 'カメラを初期化中...';
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                
+                video.srcObject = stream;
+                cameraAvailable = true;
+                
+                video.onloadedmetadata = () => {
+                    document.getElementById('capture-btn').disabled = false;
+                    status.textContent = 'レシートを撮影してください';
+                    status.className = 'alert alert-success';
+                };
+                
+            } catch (error) {
+                console.error('Camera error:', error);
+                cameraAvailable = false;
+                
+                // Show file input
+                document.getElementById('file-input').style.display = 'block';
+                document.getElementById('capture-btn').style.display = 'none';
+                video.style.display = 'none';
+                
+                status.textContent = 'カメラを利用できません。ファイルを選択してください';
+                status.className = 'alert alert-warning';
+            }
+        }
+
+        function capturePhoto() {
+            if (!cameraAvailable) return;
+            
+            const ctx = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            
+            capturedImage = canvas.toDataURL('image/jpeg', 0.8);
+            showForm();
+        }
+
+        function handleFileInput(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    capturedImage = canvas.toDataURL('image/jpeg', 0.8);
+                    showForm();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function showForm() {
+            document.getElementById('form-section').classList.remove('hidden');
+            
+            // Sample data
+            document.getElementById('company').value = 'サンプルストア';
+            document.getElementById('item').value = 'コーヒー';
+            document.getElementById('price').value = '150';
+            
+            document.getElementById('status').textContent = '情報を確認して保存してください';
+        }
+
+        function saveData() {
+            const data = {
+                date: document.getElementById('date').value,
+                company: document.getElementById('company').value,
+                item: document.getElementById('item').value,
+                price: document.getElementById('price').value,
+                timestamp: new Date().toISOString(),
+                image: capturedImage
+            };
+            
+            // Save to localStorage
+            const receipts = JSON.parse(localStorage.getItem('receipts') || '[]');
+            receipts.push(data);
+            localStorage.setItem('receipts', JSON.stringify(receipts));
+            
+            // Generate filename
+            const filename = `${data.date}_${data.company}_${data.item}_${data.price}.jpg`;
+            
+            // Show success
+            document.getElementById('results').innerHTML = `
+                <div class="alert alert-success">
+                    <strong>✅ 保存完了</strong><br>
+                    ファイル名: ${filename}<br>
+                    <small>データ数: ${receipts.length}件</small>
+                </div>
+            `;
+            
+            // Reset form
+            document.getElementById('form-section').classList.add('hidden');
+            document.getElementById('status').textContent = 'レシートを撮影してください';
+            
+            console.log('保存完了:', filename);
+        }
+
+        // Event listeners
+        document.getElementById('capture-btn').addEventListener('click', capturePhoto);
+        document.getElementById('file-input').addEventListener('change', handleFileInput);
+        document.getElementById('save-btn').addEventListener('click', saveData);
+
+        // Initialize
+        init();
+    </script>
+</body>
+</html>
