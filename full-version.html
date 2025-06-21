@@ -339,17 +339,30 @@
         function capturePhoto() {
             if (!cameraAvailable) return;
             
-            const ctx = canvas.getContext('2d');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
-            
-            capturedImage = canvas.toDataURL('image/jpeg', 0.8);
-            
-            if (openaiConfigured) {
-                processWithAI();
-            } else {
-                showManualForm();
+            try {
+                const ctx = canvas.getContext('2d');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0);
+                
+                capturedImage = canvas.toDataURL('image/jpeg', 0.8);
+                
+                // 撮影音効果（オプション）
+                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmQaAz2U2/LHRCU');
+                audio.volume = 0.1;
+                audio.play().catch(() => {}); // 音声エラーは無視
+                
+                console.log('撮影完了');
+                
+                if (openaiConfigured) {
+                    processWithAI();
+                } else {
+                    console.log('手動入力モードに移行');
+                    showManualForm();
+                }
+            } catch (error) {
+                console.error('撮影エラー:', error);
+                showResult('撮影に失敗しました', 'danger');
             }
         }
 
@@ -381,8 +394,29 @@
         async function processWithAI() {
             const apiKey = localStorage.getItem('openai_api_key');
             
+            console.log('AI処理開始');
+            console.log('API Key存在:', !!apiKey);
+            console.log('画像データ存在:', !!capturedImage);
+            
+            // API キーチェック
+            if (!apiKey || !openaiConfigured) {
+                console.log('API キー未設定 - 手動入力に移行');
+                showManualForm();
+                return;
+            }
+            
+            // 画像データチェック
+            if (!capturedImage) {
+                console.log('画像データなし');
+                showResult('画像データがありません。再撮影してください。', 'danger');
+                return;
+            }
+            
             try {
+                console.log('処理モーダル表示');
                 showProcessingModal('AI でレシートを解析中...');
+                
+                console.log('OpenAI API呼び出し開始');
                 
                 const response = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
@@ -409,32 +443,49 @@
                     })
                 });
 
+                console.log('OpenAI API応答:', response.status);
+                
+                // 必ずモーダルを非表示
                 hideProcessingModal();
 
                 if (!response.ok) {
-                    throw new Error(`OpenAI API error: ${response.status}`);
+                    const errorText = await response.text();
+                    console.error('OpenAI APIエラー:', response.status, errorText);
+                    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
                 }
 
                 const data = await response.json();
+                console.log('OpenAI応答データ:', data);
+                
                 const content = data.choices[0].message.content;
+                console.log('AI応答内容:', content);
 
                 let receiptData;
                 try {
                     receiptData = JSON.parse(content);
+                    console.log('JSON解析成功:', receiptData);
                 } catch (parseError) {
+                    console.log('JSON解析失敗、正規表現で再試行');
                     const jsonMatch = content.match(/\\{[^{}]*\\}/);
                     if (jsonMatch) {
                         receiptData = JSON.parse(jsonMatch[0]);
+                        console.log('正規表現解析成功:', receiptData);
                     } else {
+                        console.error('JSON抽出失敗');
                         throw new Error('AI応答からJSONを抽出できませんでした');
                     }
                 }
 
+                console.log('フォーム表示');
                 showForm(receiptData, true);
 
             } catch (error) {
                 console.error('AI processing failed:', error);
+                
+                // 確実にモーダルを非表示
                 hideProcessingModal();
+                
+                console.log('エラー発生 - 手動入力に移行');
                 showManualForm();
                 showResult(`⚠️ AI解析に失敗しました: ${error.message}`, 'warning');
             }
@@ -561,12 +612,25 @@
         }
 
         function showProcessingModal(text) {
+            console.log('モーダル表示:', text);
             document.getElementById('processing-text').textContent = text;
             document.getElementById('processing-modal').classList.remove('hidden');
         }
 
         function hideProcessingModal() {
+            console.log('モーダル非表示');
             document.getElementById('processing-modal').classList.add('hidden');
+            
+            // 強制的にモーダルを確実に非表示
+            setTimeout(() => {
+                const modal = document.getElementById('processing-modal');
+                if (modal) {
+                    modal.style.display = 'none';
+                    setTimeout(() => {
+                        modal.style.display = '';
+                    }, 100);
+                }
+            }, 100);
         }
 
         function showResult(message, type) {
