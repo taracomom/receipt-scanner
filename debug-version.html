@@ -108,7 +108,8 @@
             <div class="modal-content">
                 <div class="loading" style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; margin: 0 auto 15px;"></div>
                 <div id="processing-text">処理中...</div>
-                <button class="btn btn-danger" onclick="forceStopProcessing()" style="margin-top: 15px;">強制停止</button>
+                <button class="btn btn-danger" onclick="forceStopProcessing()" style="margin-top: 15px;">🛑 強制停止</button>
+                <button class="btn btn-warning" onclick="location.reload()" style="margin-top: 10px;">🔄 ページリロード</button>
             </div>
         </div>
 
@@ -145,9 +146,30 @@
 
         function forceStopProcessing() {
             debugLog('🛑 強制停止が実行されました');
+            
+            // 全ての処理フラグをリセット
             processingActive = false;
+            window.processingActive = false;
+            
+            // すべてのfetch処理を中断（AbortControllerを使用）
+            if (window.currentAbortController) {
+                window.currentAbortController.abort();
+                debugLog('🛑 API呼び出しを中断しました');
+            }
+            
+            // モーダルを強制非表示
             hideProcessingModal();
-            showResult('処理が強制停止されました', 'warning');
+            
+            // 5秒後にページリロード（最終手段）
+            debugLog('🔄 5秒後にページをリロードします');
+            setTimeout(() => {
+                if (!processingActive) {
+                    debugLog('🔄 ページリロード実行');
+                    location.reload();
+                }
+            }, 5000);
+            
+            showResult('処理が強制停止されました。5秒後にページがリロードされます。', 'warning');
         }
 
         async function init() {
@@ -339,6 +361,10 @@
             }
             
             processingActive = true;
+            window.processingActive = true;
+            
+            // AbortController for cancelling requests
+            window.currentAbortController = new AbortController();
             
             try {
                 debugLog('🔄 処理モーダル表示');
@@ -347,6 +373,7 @@
                 debugLog('🌐 OpenAI API呼び出し開始');
                 
                 const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    signal: window.currentAbortController.signal,
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -415,13 +442,26 @@
             } catch (error) {
                 debugLog(`❌ AI処理エラー: ${error.message}`);
                 
+                // 中断エラーかどうかチェック
+                if (error.name === 'AbortError') {
+                    debugLog('🛑 API呼び出しが中断されました');
+                    showResult('処理が中断されました', 'warning');
+                    return;
+                }
+                
                 if (processingActive) {
                     hideProcessingModal();
                     processingActive = false;
+                    window.processingActive = false;
                 }
                 
                 showManualForm();
                 showResult(`⚠️ AI解析に失敗しました: ${error.message}`, 'warning');
+            } finally {
+                // 確実にフラグをリセット
+                processingActive = false;
+                window.processingActive = false;
+                window.currentAbortController = null;
             }
         }
 
