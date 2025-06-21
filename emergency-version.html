@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt Scanner - 緊急修正版</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: sans-serif; background: #f5f5f5; padding: 10px; font-size: 14px; }
+        .container { max-width: 400px; margin: 0 auto; background: white; border-radius: 10px; padding: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .camera-section { background: black; border-radius: 10px; margin-bottom: 15px; height: 200px; display: flex; align-items: center; justify-content: center; }
+        video { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; margin: 8px 0; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .form-group { margin: 8px 0; }
+        label { display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px; }
+        input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; }
+        .alert { padding: 8px; border-radius: 5px; margin: 8px 0; font-size: 12px; }
+        .alert-success { background: #d4edda; color: #155724; }
+        .alert-warning { background: #fff3cd; color: #856404; }
+        .alert-danger { background: #f8d7da; color: #721c24; }
+        .alert-info { background: #d1ecf1; color: #0c5460; }
+        .hidden { display: none; }
+        .debug-log { background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 10px 0; max-height: 100px; overflow-y: auto; font-family: monospace; font-size: 10px; }
+        .emergency-stop { position: fixed; top: 10px; right: 10px; z-index: 9999; background: #dc3545; color: white; border: none; padding: 15px; border-radius: 50%; font-size: 20px; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .timer { font-size: 18px; font-weight: bold; color: #dc3545; text-align: center; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <!-- 緊急停止ボタン（常時表示） -->
+    <button class="emergency-stop" onclick="emergencyStop()" title="緊急停止">🛑</button>
+
+    <div class="container">
+        <h1>🚨 Receipt Scanner</h1>
+        <p>緊急修正版 - 絶対止まる</p>
+
+        <!-- Emergency Timer -->
+        <div id="emergency-timer" class="timer hidden">
+            自動停止まで: <span id="countdown">10</span>秒
+        </div>
+
+        <!-- Debug Log -->
+        <div id="debug-log" class="debug-log"></div>
+
+        <!-- Settings -->
+        <div class="form-group">
+            <label>OpenAI API Key（テスト用）</label>
+            <input type="password" id="openai-api-key" placeholder="sk-proj-..." value="test-key">
+            <button class="btn btn-primary" onclick="saveOpenAIKey()">保存</button>
+        </div>
+
+        <!-- Camera Section -->
+        <div class="camera-section">
+            <video id="video" autoplay playsinline muted></video>
+            <canvas id="canvas" class="hidden"></canvas>
+        </div>
+
+        <!-- File Input (fallback) -->
+        <input type="file" id="file-input" accept="image/*" capture="environment" class="btn btn-primary" style="display: none;">
+
+        <!-- Main Action Button -->
+        <button id="capture-btn" class="btn btn-primary" disabled>📷 撮影してテスト</button>
+
+        <!-- Form -->
+        <div id="form-section" class="hidden">
+            <h3>結果</h3>
+            <div class="form-group">
+                <label>日付</label>
+                <input type="date" id="date">
+            </div>
+            <div class="form-group">
+                <label>会社名</label>
+                <input type="text" id="company">
+            </div>
+            <div class="form-group">
+                <label>品名</label>
+                <input type="text" id="item">
+            </div>
+            <div class="form-group">
+                <label>価格</label>
+                <input type="number" id="price">
+            </div>
+            <button id="save-btn" class="btn btn-success">💾 保存</button>
+        </div>
+
+        <!-- Simple Processing Indicator -->
+        <div id="processing-simple" class="alert alert-warning hidden">
+            <div style="text-align: center;">
+                <div>🔄 AI処理中...</div>
+                <div style="margin-top: 10px;">
+                    <button class="btn btn-danger" onclick="emergencyStop()">🛑 緊急停止</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div id="results"></div>
+        <div id="status" class="alert alert-info">カメラ初期化中...</div>
+    </div>
+
+    <script>
+        let video, canvas, capturedImage;
+        let cameraAvailable = false;
+        let openaiConfigured = false;
+        let emergencyTimerActive = false;
+        let emergencyTimerId = null;
+
+        // Emergency stop function - ALWAYS works
+        function emergencyStop() {
+            debugLog('🚨 緊急停止実行');
+            
+            // Stop all timers
+            if (emergencyTimerId) {
+                clearInterval(emergencyTimerId);
+                emergencyTimerId = null;
+            }
+            
+            // Hide all processing indicators
+            document.getElementById('processing-simple').classList.add('hidden');
+            document.getElementById('emergency-timer').classList.add('hidden');
+            
+            // Reset flags
+            emergencyTimerActive = false;
+            
+            // Show manual form immediately
+            showManualForm();
+            
+            debugLog('✅ 緊急停止完了');
+            showResult('🚨 緊急停止されました', 'warning');
+        }
+
+        // Auto emergency stop after 10 seconds
+        function startEmergencyTimer() {
+            debugLog('⏰ 緊急タイマー開始（10秒）');
+            emergencyTimerActive = true;
+            let countdown = 10;
+            
+            document.getElementById('emergency-timer').classList.remove('hidden');
+            document.getElementById('countdown').textContent = countdown;
+            
+            emergencyTimerId = setInterval(() => {
+                countdown--;
+                document.getElementById('countdown').textContent = countdown;
+                
+                if (countdown <= 0) {
+                    debugLog('⏰ 自動緊急停止実行');
+                    emergencyStop();
+                }
+            }, 1000);
+        }
+
+        function debugLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('debug-log');
+            logElement.innerHTML += `[${timestamp}] ${message}<br>`;
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            // Keep only last 5 lines
+            const lines = logElement.innerHTML.split('<br>');
+            if (lines.length > 6) {
+                logElement.innerHTML = lines.slice(-6).join('<br>');
+            }
+        }
+
+        async function init() {
+            debugLog('🚀 初期化開始');
+            
+            video = document.getElementById('video');
+            canvas = document.getElementById('canvas');
+            
+            await initCamera();
+            debugLog('✅ 初期化完了');
+        }
+
+        async function initCamera() {
+            debugLog('📷 カメラ初期化');
+            const status = document.getElementById('status');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: 'environment' } }
+                });
+                
+                video.srcObject = stream;
+                cameraAvailable = true;
+                debugLog('✅ カメラ取得成功');
+                
+                video.onloadedmetadata = () => {
+                    document.getElementById('capture-btn').disabled = false;
+                    status.textContent = 'カメラ準備完了 - 撮影してテストできます';
+                    status.className = 'alert alert-success';
+                };
+                
+            } catch (error) {
+                debugLog(`❌ カメラエラー: ${error.message}`);
+                cameraAvailable = false;
+                
+                document.getElementById('file-input').style.display = 'block';
+                document.getElementById('capture-btn').style.display = 'none';
+                video.style.display = 'none';
+                
+                status.textContent = 'ファイル選択モード';
+                status.className = 'alert alert-warning';
+            }
+        }
+
+        function saveOpenAIKey() {
+            debugLog('🔑 API キー保存');
+            const apiKey = document.getElementById('openai-api-key').value.trim();
+            
+            if (apiKey) {
+                localStorage.setItem('openai_api_key', apiKey);
+                openaiConfigured = true;
+                debugLog('✅ API キー設定完了');
+                showResult('API キーを設定しました', 'success');
+            }
+        }
+
+        function capturePhoto() {
+            debugLog('📸 撮影開始');
+            
+            if (!cameraAvailable) {
+                debugLog('❌ カメラ利用不可');
+                return;
+            }
+            
+            try {
+                const ctx = canvas.getContext('2d');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0);
+                
+                capturedImage = canvas.toDataURL('image/jpeg', 0.8);
+                debugLog('✅ 撮影完了');
+                
+                // Simulate AI processing
+                if (openaiConfigured) {
+                    simulateAIProcessing();
+                } else {
+                    showManualForm();
+                }
+                
+            } catch (error) {
+                debugLog(`❌ 撮影エラー: ${error.message}`);
+                showResult('撮影に失敗しました', 'danger');
+            }
+        }
+
+        function handleFileInput(event) {
+            debugLog('📁 ファイル選択');
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    capturedImage = canvas.toDataURL('image/jpeg', 0.8);
+                    debugLog('✅ ファイル読み込み完了');
+                    
+                    if (openaiConfigured) {
+                        simulateAIProcessing();
+                    } else {
+                        showManualForm();
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function simulateAIProcessing() {
+            debugLog('🤖 AI処理シミュレーション開始');
+            
+            // Show simple processing indicator
+            document.getElementById('processing-simple').classList.remove('hidden');
+            
+            // Start emergency timer
+            startEmergencyTimer();
+            
+            // Simulate API call with random delay
+            const delay = Math.random() * 8000 + 2000; // 2-10 seconds
+            debugLog(`⏰ ${Math.round(delay/1000)}秒後に処理完了予定`);
+            
+            setTimeout(() => {
+                if (emergencyTimerActive) {
+                    debugLog('✅ AI処理完了');
+                    emergencyStop(); // This will clean up and show form
+                    
+                    // Show mock data
+                    document.getElementById('date').value = new Date().toISOString().split('T')[0];
+                    document.getElementById('company').value = 'テストストア';
+                    document.getElementById('item').value = 'テスト商品';
+                    document.getElementById('price').value = '150';
+                    
+                    showResult('AI解析完了（シミュレーション）', 'success');
+                }
+            }, delay);
+        }
+
+        function showManualForm() {
+            debugLog('✏️ 手動フォーム表示');
+            
+            document.getElementById('date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('company').value = '';
+            document.getElementById('item').value = '';
+            document.getElementById('price').value = '';
+            
+            document.getElementById('form-section').classList.remove('hidden');
+            document.getElementById('status').textContent = '情報を入力して保存してください';
+        }
+
+        function saveData() {
+            debugLog('💾 データ保存');
+            const data = {
+                date: document.getElementById('date').value,
+                company: document.getElementById('company').value,
+                item: document.getElementById('item').value,
+                price: document.getElementById('price').value,
+                timestamp: new Date().toISOString()
+            };
+            
+            const receipts = JSON.parse(localStorage.getItem('receipts') || '[]');
+            receipts.push(data);
+            localStorage.setItem('receipts', JSON.stringify(receipts));
+            
+            const filename = `${data.date}_${data.company}_${data.item}_${data.price}.jpg`;
+            debugLog(`✅ 保存完了: ${filename}`);
+            showResult(`💾 保存完了<br>ファイル名: ${filename}`, 'success');
+            
+            // Reset form
+            document.getElementById('form-section').classList.add('hidden');
+            document.getElementById('status').textContent = 'カメラ準備完了 - 撮影してテストできます';
+        }
+
+        function showResult(message, type) {
+            debugLog(`📢 結果表示: ${type}`);
+            document.getElementById('results').innerHTML = `
+                <div class="alert alert-${type}">
+                    ${message}
+                </div>
+            `;
+        }
+
+        // Event listeners
+        document.getElementById('capture-btn').addEventListener('click', capturePhoto);
+        document.getElementById('file-input').addEventListener('change', handleFileInput);
+        document.getElementById('save-btn').addEventListener('click', saveData);
+
+        // Initialize
+        init();
+        
+        // Auto save API key for testing
+        setTimeout(() => {
+            if (document.getElementById('openai-api-key').value === 'test-key') {
+                saveOpenAIKey();
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
