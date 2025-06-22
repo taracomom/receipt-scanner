@@ -609,10 +609,19 @@
                     debugLog('✅ JSON解析成功');
                 } catch (parseError) {
                     debugLog('🔧 JSON解析失敗、正規表現で再試行');
-                    const jsonMatch = content.match(/\\{[^}]*\\}/);
+                    // Try to extract JSON from markdown code blocks or plain text
+                    let jsonMatch = content.match(/```(?:json)?\s*(\{[^}]*\})\s*```/);
+                    if (!jsonMatch) {
+                        jsonMatch = content.match(/(\{[^}]*\})/);
+                    }
                     if (jsonMatch) {
-                        receiptData = JSON.parse(jsonMatch[0]);
-                        debugLog('✅ 正規表現解析成功');
+                        try {
+                            receiptData = JSON.parse(jsonMatch[1]);
+                            debugLog('✅ 正規表現解析成功');
+                        } catch (e) {
+                            debugLog(`❌ JSON解析エラー: ${e.message}`);
+                            throw new Error('抽出したJSONの解析に失敗しました');
+                        }
                     } else {
                         debugLog('❌ JSON抽出失敗');
                         throw new Error('AI応答からJSONを抽出できませんでした');

@@ -503,9 +503,13 @@
                 try {
                     receiptData = JSON.parse(content);
                 } catch (parseError) {
-                    const jsonMatch = content.match(/\\{[^}]*\\}/);
+                    // Try to extract JSON from markdown code blocks or plain text
+                    let jsonMatch = content.match(/```(?:json)?\s*(\{[^}]*\})\s*```/);
+                    if (!jsonMatch) {
+                        jsonMatch = content.match(/(\{[^}]*\})/);
+                    }
                     if (jsonMatch) {
-                        receiptData = JSON.parse(jsonMatch[0]);
+                        receiptData = JSON.parse(jsonMatch[1]);
                     } else {
                         throw new Error('AI応答からJSONを抽出できませんでした');
                     }
