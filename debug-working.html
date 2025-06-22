@@ -280,6 +280,7 @@
         <!-- Main Action Button -->
         <div class="main-actions">
             <button id="capture-btn" class="btn btn-primary" disabled>📷 撮影してAI解析</button>
+            <button id="emergency-camera-btn" class="btn btn-warning" onclick="emergencyInitCamera()" style="margin-top: 8px;">🚨 カメラ強制初期化</button>
             <div id="status" class="alert alert-warning">初期化中...</div>
         </div>
 
@@ -549,18 +550,31 @@
                     throw new Error('このブラウザはカメラ機能に対応していません');
                 }
                 
-                const constraints = {
-                    video: { 
-                        facingMode: { ideal: 'environment' },
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
-                };
+                // Try different constraint approaches
+                let constraints = { video: true }; // Start with simplest
                 
-                debugLog('📷 getUserMedia呼び出し');
+                try {
+                    // First try basic video
+                    debugLog('🔧 基本制約で試行: { video: true }');
+                    var stream = await navigator.mediaDevices.getUserMedia(constraints);
+                } catch (basicError) {
+                    debugLog(`❌ 基本制約失敗: ${basicError.message}`);
+                    
+                    // Try with specific camera preferences
+                    constraints = {
+                        video: { 
+                            facingMode: { ideal: 'environment' }
+                        }
+                    };
+                    debugLog('🔧 リアカメラ優先で再試行');
+                }
+                
+                debugLog('📷 getUserMedia最終呼び出し');
                 debugLog(`🔧 制約: ${JSON.stringify(constraints)}`);
                 
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                if (!stream) {
+                    stream = await navigator.mediaDevices.getUserMedia(constraints);
+                }
                 
                 video.srcObject = stream;
                 cameraAvailable = true;
@@ -1233,6 +1247,54 @@
             // Try to load folders again
             debugLog('🔄 フォルダ再読み込み実行');
             loadFolders();
+        }
+
+        async function emergencyInitCamera() {
+            debugLog('🚨 カメラ強制初期化開始');
+            const status = document.getElementById('status');
+            const overlay = document.getElementById('camera-overlay');
+            
+            // Stop existing stream first
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+                debugLog('🛑 既存ストリームを停止');
+            }
+            
+            cameraAvailable = false;
+            overlay.textContent = '🚨 強制初期化中...';
+            
+            try {
+                // Try simplest constraints first
+                debugLog('🔧 最簡単な制約で再試行');
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                
+                video.srcObject = stream;
+                cameraAvailable = true;
+                debugLog('✅ 強制初期化成功');
+                
+                video.onloadedmetadata = () => {
+                    debugLog('📹 強制初期化後メタデータ読み込み完了');
+                    overlay.textContent = 'レシートをここに映してください';
+                    document.getElementById('capture-btn').disabled = false;
+                    status.textContent = '✅ カメラが正常に動作しています';
+                    status.className = 'alert alert-success';
+                    document.getElementById('emergency-camera-btn').style.display = 'none';
+                };
+                
+            } catch (error) {
+                debugLog(`❌ 強制初期化失敗: ${error.message}`);
+                overlay.textContent = 'カメラ利用不可 - ファイル選択してください';
+                
+                // Show file input as alternative
+                document.getElementById('file-input').style.display = 'block';
+                document.getElementById('capture-btn').textContent = '📁 ファイルを選択';
+                document.getElementById('capture-btn').disabled = false;
+                document.getElementById('capture-btn').onclick = () => document.getElementById('file-input').click();
+                
+                status.textContent = `カメラエラー: ${error.message}`;
+                status.className = 'alert alert-danger';
+            }
         }
 
         function testCamera() {

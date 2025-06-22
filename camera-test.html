@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カメラテスト</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        video { width: 100%; max-width: 400px; height: 300px; background: black; border: 2px solid #ccc; }
+        button { padding: 10px 20px; margin: 5px; font-size: 16px; }
+        .log { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>📷 カメラテスト</h1>
+    <p>このページでカメラが動作するかテストします。</p>
+    
+    <video id="video" autoplay playsinline muted></video>
+    
+    <div>
+        <button onclick="startBasicCamera()">基本カメラ開始</button>
+        <button onclick="startRearCamera()">リアカメラ開始</button>
+        <button onclick="stopCamera()">カメラ停止</button>
+        <button onclick="clearLog()">ログクリア</button>
+    </div>
+    
+    <div id="status">カメラテスト準備完了</div>
+    <div id="log" class="log"></div>
+
+    <script>
+        const video = document.getElementById('video');
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+        let currentStream = null;
+
+        function addLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            log.innerHTML += `[${timestamp}] ${message}<br>`;
+            log.scrollTop = log.scrollHeight;
+            console.log(message);
+        }
+
+        function clearLog() {
+            log.innerHTML = '';
+        }
+
+        function updateStatus(message) {
+            status.textContent = message;
+            addLog(`ステータス: ${message}`);
+        }
+
+        async function startBasicCamera() {
+            addLog('🔧 基本カメラ開始');
+            stopCamera();
+            
+            try {
+                updateStatus('カメラ許可を確認中...');
+                addLog('getUserMedia呼び出し: { video: true }');
+                
+                currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = currentStream;
+                
+                addLog('✅ カメラストリーム取得成功');
+                updateStatus('カメラ動作中');
+                
+                video.onloadedmetadata = () => {
+                    addLog(`📐 ビデオサイズ: ${video.videoWidth}x${video.videoHeight}`);
+                };
+                
+            } catch (error) {
+                addLog(`❌ エラー: ${error.name} - ${error.message}`);
+                updateStatus(`エラー: ${error.message}`);
+            }
+        }
+
+        async function startRearCamera() {
+            addLog('🔧 リアカメラ開始');
+            stopCamera();
+            
+            try {
+                updateStatus('リアカメラ許可を確認中...');
+                addLog('getUserMedia呼び出し: facingMode environment');
+                
+                currentStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }
+                });
+                video.srcObject = currentStream;
+                
+                addLog('✅ リアカメラストリーム取得成功');
+                updateStatus('リアカメラ動作中');
+                
+                video.onloadedmetadata = () => {
+                    addLog(`📐 ビデオサイズ: ${video.videoWidth}x${video.videoHeight}`);
+                };
+                
+            } catch (error) {
+                addLog(`❌ エラー: ${error.name} - ${error.message}`);
+                updateStatus(`エラー: ${error.message}`);
+                
+                // Fallback to basic camera
+                addLog('📱 基本カメラにフォールバック');
+                startBasicCamera();
+            }
+        }
+
+        function stopCamera() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => {
+                    track.stop();
+                    addLog(`🛑 トラック停止: ${track.label}`);
+                });
+                currentStream = null;
+                video.srcObject = null;
+                updateStatus('カメラ停止');
+            }
+        }
+
+        // 初期化
+        addLog('📱 カメラテストページ読み込み完了');
+        addLog(`🌐 ブラウザ: ${navigator.userAgent}`);
+        addLog(`📷 MediaDevices対応: ${!!navigator.mediaDevices}`);
+        addLog(`🎥 getUserMedia対応: ${!!navigator.mediaDevices?.getUserMedia}`);
+    </script>
+</body>
+</html>
