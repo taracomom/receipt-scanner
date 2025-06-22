@@ -104,6 +104,7 @@
                     </select>
                     <button class="btn btn-warning" onclick="refreshFolders()" style="margin-top: 5px; font-size: 12px; padding: 8px;">🔄 フォルダ更新</button>
                     <button class="btn btn-info" onclick="debugFolderState()" style="margin-top: 5px; font-size: 12px; padding: 8px;">🔍 フォルダ状態確認</button>
+                    <button class="btn btn-success" onclick="testApiDirectly()" style="margin-top: 5px; font-size: 12px; padding: 8px;">🧪 API直接テスト</button>
                 </div>
             </div>
         </div>
@@ -601,6 +602,95 @@
             // Try to load folders again
             debugLog('🔄 フォルダ再読み込み実行');
             loadFolders();
+        }
+
+        async function testApiDirectly() {
+            debugLog('🧪 API直接テスト開始');
+            
+            if (!accessToken) {
+                debugLog('❌ アクセストークンがありません');
+                alert('Google Driveに接続してください');
+                return;
+            }
+
+            try {
+                // Test 1: Basic API access
+                debugLog('🔬 テスト1: 基本的なAPI接続確認');
+                const aboutResponse = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                debugLog(`📡 About API応答: ${aboutResponse.status}`);
+                
+                if (aboutResponse.ok) {
+                    const aboutData = await aboutResponse.json();
+                    debugLog(`✅ ユーザー情報取得成功: ${aboutData.user.emailAddress}`);
+                } else {
+                    debugLog(`❌ About API失敗: ${aboutResponse.status}`);
+                    return;
+                }
+
+                // Test 2: All files (not just folders)
+                debugLog('🔬 テスト2: 全ファイル取得');
+                const allFilesResponse = await fetch('https://www.googleapis.com/drive/v3/files?pageSize=10&fields=files(id,name,mimeType)', {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                debugLog(`📡 全ファイルAPI応答: ${allFilesResponse.status}`);
+                
+                if (allFilesResponse.ok) {
+                    const allFilesData = await allFilesResponse.json();
+                    debugLog(`✅ 全ファイル取得成功: ${allFilesData.files.length}個`);
+                    allFilesData.files.forEach((file, index) => {
+                        debugLog(`📄 ${index + 1}. ${file.name} (${file.mimeType})`);
+                    });
+                }
+
+                // Test 3: Folders specifically
+                debugLog('🔬 テスト3: フォルダのみ取得');
+                const folderResponse = await fetch('https://www.googleapis.com/drive/v3/files?q=mimeType="application/vnd.google-apps.folder"&pageSize=20&fields=files(id,name,parents)', {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                debugLog(`📡 フォルダAPI応答: ${folderResponse.status}`);
+                
+                if (folderResponse.ok) {
+                    const folderData = await folderResponse.json();
+                    debugLog(`✅ フォルダ取得成功: ${folderData.files.length}個`);
+                    
+                    if (folderData.files.length === 0) {
+                        debugLog('⚠️ フォルダが0個です！新しいフォルダを作成してください。');
+                        alert('Google Driveにフォルダが見つかりません。\\nGoogle Driveで新しいフォルダを作成してから再試行してください。');
+                    } else {
+                        folderData.files.forEach((folder, index) => {
+                            debugLog(`📂 ${index + 1}. ${folder.name} (ID: ${folder.id})`);
+                            if (folder.parents) {
+                                debugLog(`   └ 親フォルダ: ${folder.parents.join(', ')}`);
+                            }
+                        });
+                        
+                        // Test 4: Manual dropdown update
+                        debugLog('🔬 テスト4: 手動ドロップダウン更新');
+                        const select = document.getElementById('folder-select');
+                        select.innerHTML = '<option value="">ルートフォルダ（My Drive）</option>';
+                        
+                        folderData.files.forEach((folder, index) => {
+                            const option = document.createElement('option');
+                            option.value = folder.id;
+                            option.textContent = `${folder.name}`;
+                            select.appendChild(option);
+                            debugLog(`➕ 手動追加: ${folder.name}`);
+                        });
+                        
+                        debugLog(`✅ 手動ドロップダウン更新完了: ${select.options.length}個のオプション`);
+                        alert(`フォルダ取得成功！${folderData.files.length}個のフォルダをドロップダウンに追加しました。`);
+                    }
+                } else {
+                    const errorText = await folderResponse.text();
+                    debugLog(`❌ フォルダAPI失敗: ${folderResponse.status} - ${errorText}`);
+                }
+
+            } catch (error) {
+                debugLog(`❌ API直接テスト失敗: ${error.message}`);
+                debugLog(`❌ エラー詳細: ${error.stack}`);
+            }
         }
 
         function updateMainStatus() {
