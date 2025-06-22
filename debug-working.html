@@ -511,7 +511,7 @@
                 
                 // Get all folders once and cache them
                 if (allFolders.length === 0) {
-                    const allResponse = await fetch('https://www.googleapis.com/drive/v3/files?q=mimeType="application/vnd.google-apps.folder"&pageSize=1000&fields=files(id,name,parents)', {
+                    const allResponse = await fetch('https://www.googleapis.com/drive/v3/files?q=mimeType="application/vnd.google-apps.folder"&pageSize=1000&fields=files(id,name,parents,mimeType)', {
                         headers: {
                             'Authorization': `Bearer ${accessToken}`
                         }
@@ -519,13 +519,33 @@
 
                     if (allResponse.ok) {
                         const allData = await allResponse.json();
-                        allFolders = allData.files || [];
+                        // Double-check that we only get folders
+                        allFolders = (allData.files || []).filter(file => 
+                            file.mimeType === 'application/vnd.google-apps.folder'
+                        );
                         debugLog(`✅ 全フォルダキャッシュ: ${allFolders.length}個`);
+                        
+                        // Log any non-folders that were returned for debugging
+                        const nonFolders = (allData.files || []).filter(file => 
+                            file.mimeType !== 'application/vnd.google-apps.folder'
+                        );
+                        if (nonFolders.length > 0) {
+                            debugLog(`⚠️ フォルダでないアイテム: ${nonFolders.length}個`);
+                            nonFolders.forEach(file => {
+                                debugLog(`📄 ファイル: ${file.name} (${file.mimeType})`);
+                            });
+                        }
                     }
                 }
 
                 // Filter folders for current level
                 const currentLevelFolders = allFolders.filter(folder => {
+                    // Ensure it's actually a folder
+                    if (folder.mimeType && folder.mimeType !== 'application/vnd.google-apps.folder') {
+                        debugLog(`⚠️ ファイルをスキップ: ${folder.name} (${folder.mimeType})`);
+                        return false;
+                    }
+                    
                     if (parentId === '') {
                         // Root level: folders with no parents or parents not in our folder list
                         return !folder.parents || folder.parents.length === 0 || 
@@ -557,9 +577,9 @@
                 currentLevelFolders.forEach(folder => {
                     const option = document.createElement('option');
                     option.value = folder.id;
-                    option.textContent = folder.name;
+                    option.textContent = `📁 ${folder.name}`;
                     select.appendChild(option);
-                    debugLog(`➕ オプション追加: ${folder.name}`);
+                    debugLog(`➕ フォルダオプション追加: ${folder.name} (ID: ${folder.id})`);
                 });
 
                 debugLog(`📋 セレクトボックスのオプション数: ${select.options.length}`);
@@ -569,7 +589,8 @@
                     const enterBtn = document.getElementById('enter-folder-btn');
                     if (this.value) {
                         enterBtn.disabled = false;
-                        enterBtn.textContent = `📂 ${this.options[this.selectedIndex].text} を開く`;
+                        const folderName = this.options[this.selectedIndex].text.replace('📁 ', '');
+                        enterBtn.textContent = `📂 ${folderName} を開く`;
                     } else {
                         enterBtn.disabled = true;
                         enterBtn.textContent = '📂 フォルダを開く';
