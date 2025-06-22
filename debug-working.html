@@ -176,7 +176,7 @@
         let debugLogVisible = true;
         let selectedFolderId = '';
 
-        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly';
 
         function debugLog(message) {
             const timestamp = new Date().toLocaleTimeString();
@@ -440,16 +440,24 @@
             }
 
             try {
-                const response = await fetch('https://www.googleapis.com/drive/v3/files?q=mimeType="application/vnd.google-apps.folder"&pageSize=50&fields=files(id,name)', {
+                debugLog('🌐 Google Drive フォルダAPI呼び出し');
+                const response = await fetch('https://www.googleapis.com/drive/v3/files?q=mimeType="application/vnd.google-apps.folder"&pageSize=50&fields=files(id,name)&orderBy=name', {
                     headers: {
                         'Authorization': `Bearer ${accessToken}`
                     }
                 });
 
+                debugLog(`📡 フォルダAPI応答: ${response.status}`);
+
                 if (response.ok) {
                     const data = await response.json();
                     const folders = data.files || [];
                     debugLog(`✅ フォルダ取得成功: ${folders.length}個`);
+                    
+                    // Log folder names for debugging
+                    folders.forEach(folder => {
+                        debugLog(`📂 フォルダ: ${folder.name} (${folder.id})`);
+                    });
                     
                     const select = document.getElementById('folder-select');
                     // Clear existing options except root
@@ -478,8 +486,13 @@
                         debugLog(`📁 フォルダ選択変更: ${folderName} (${selectedFolderId})`);
                     };
 
+                } else if (response.status === 401) {
+                    debugLog('🔄 フォルダ取得で認証エラー、再認証が必要');
+                    localStorage.removeItem('google_access_token');
+                    updateDriveStatus(false);
                 } else {
-                    debugLog(`❌ フォルダ取得エラー: ${response.status}`);
+                    const errorText = await response.text();
+                    debugLog(`❌ フォルダ取得エラー: ${response.status} - ${errorText}`);
                 }
             } catch (error) {
                 debugLog(`❌ フォルダ取得失敗: ${error.message}`);
