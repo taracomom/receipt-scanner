@@ -94,6 +94,16 @@
                 <button class="btn btn-primary" onclick="saveClientId()">保存</button>
             </div>
             <button id="connect-drive-btn" class="btn btn-primary" onclick="connectGoogleDrive()">🔗 Google Drive接続</button>
+            
+            <div id="folder-selection" class="hidden" style="margin-top: 15px;">
+                <div class="form-group">
+                    <label>保存先フォルダ</label>
+                    <select id="folder-select" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                        <option value="">ルートフォルダ（My Drive）</option>
+                    </select>
+                    <button class="btn btn-warning" onclick="refreshFolders()" style="margin-top: 5px; font-size: 12px; padding: 8px;">🔄 フォルダ更新</button>
+                </div>
+            </div>
         </div>
 
         <!-- Camera Section -->
@@ -164,6 +174,7 @@
         let processingStartTime = null;
         let isProcessing = false;
         let debugLogVisible = true;
+        let selectedFolderId = '';
 
         const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
@@ -231,6 +242,8 @@
                 debugLog('💾 保存されたGoogle Access Tokenを読み込み');
                 accessToken = savedAccessToken;
                 updateDriveStatus(true);
+                // Load folders on startup if already authenticated
+                loadFolders();
             }
 
             // Check OAuth callback
@@ -363,6 +376,9 @@
                     updateDriveStatus(true);
                     debugLog('✅ Google Drive認証完了');
                     
+                    // Load folders after authentication
+                    loadFolders();
+                    
                     // Clean URL
                     window.history.replaceState({}, document.title, window.location.pathname);
                 }
@@ -396,6 +412,7 @@
                 connectBtn.textContent = '🔓 切断';
                 connectBtn.onclick = disconnectGoogleDrive;
                 saveDriveBtn.disabled = false;
+                document.getElementById('folder-selection').classList.remove('hidden');
                 debugLog('✅ Google Driveステータス: 接続済み');
             } else {
                 statusEl.className = 'status-item status-disconnected';
@@ -403,6 +420,7 @@
                 connectBtn.textContent = '🔗 Google Drive接続';
                 connectBtn.onclick = connectGoogleDrive;
                 saveDriveBtn.disabled = true;
+                document.getElementById('folder-selection').classList.add('hidden');
                 debugLog('⚠️ Google Driveステータス: 未接続');
             }
         }
@@ -412,6 +430,65 @@
             accessToken = null;
             localStorage.removeItem('google_access_token');
             updateDriveStatus(false);
+        }
+
+        async function loadFolders() {
+            debugLog('📁 フォルダ一覧取得開始');
+            if (!accessToken) {
+                debugLog('❌ アクセストークンなし');
+                return;
+            }
+
+            try {
+                const response = await fetch('https://www.googleapis.com/drive/v3/files?q=mimeType="application/vnd.google-apps.folder"&pageSize=50&fields=files(id,name)', {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const folders = data.files || [];
+                    debugLog(`✅ フォルダ取得成功: ${folders.length}個`);
+                    
+                    const select = document.getElementById('folder-select');
+                    // Clear existing options except root
+                    select.innerHTML = '<option value="">ルートフォルダ（My Drive）</option>';
+                    
+                    folders.forEach(folder => {
+                        const option = document.createElement('option');
+                        option.value = folder.id;
+                        option.textContent = folder.name;
+                        select.appendChild(option);
+                    });
+
+                    // Load saved folder preference
+                    const savedFolderId = localStorage.getItem('selected_folder_id');
+                    if (savedFolderId) {
+                        select.value = savedFolderId;
+                        selectedFolderId = savedFolderId;
+                        debugLog(`📁 保存済みフォルダを選択: ${savedFolderId}`);
+                    }
+
+                    // Add change listener
+                    select.onchange = function() {
+                        selectedFolderId = this.value;
+                        localStorage.setItem('selected_folder_id', selectedFolderId);
+                        const folderName = this.options[this.selectedIndex].text;
+                        debugLog(`📁 フォルダ選択変更: ${folderName} (${selectedFolderId})`);
+                    };
+
+                } else {
+                    debugLog(`❌ フォルダ取得エラー: ${response.status}`);
+                }
+            } catch (error) {
+                debugLog(`❌ フォルダ取得失敗: ${error.message}`);
+            }
+        }
+
+        function refreshFolders() {
+            debugLog('🔄 フォルダ更新');
+            loadFolders();
         }
 
         function updateMainStatus() {
@@ -737,7 +814,14 @@
 
                 // Simple upload using multipart
                 const formData = new FormData();
-                formData.append('metadata', new Blob([JSON.stringify({name: filename})], {type: 'application/json'}));
+                const metadata = {name: filename};
+                if (selectedFolderId) {
+                    metadata.parents = [selectedFolderId];
+                    debugLog(`📁 指定フォルダに保存: ${selectedFolderId}`);
+                } else {
+                    debugLog('📁 ルートフォルダに保存');
+                }
+                formData.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
                 formData.append('file', blob);
 
                 debugLog('🌐 Google Drive API呼び出し');
