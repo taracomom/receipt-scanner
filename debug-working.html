@@ -8,46 +8,197 @@
     <meta name="theme-color" content="#007bff">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: sans-serif; background: #f5f5f5; padding: 10px; }
-        .container { max-width: 400px; margin: 0 auto; background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .camera-section { background: black; border-radius: 10px; margin-bottom: 20px; height: 250px; display: flex; align-items: center; justify-content: center; }
-        video { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
-        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin: 10px 0; cursor: pointer; }
-        .btn-primary { background: #007bff; color: white; }
-        .btn-success { background: #28a745; color: white; }
-        .btn-warning { background: #ffc107; color: black; }
-        .btn-danger { background: #dc3545; color: white; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .form-group { margin: 10px 0; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
-        .alert { padding: 10px; border-radius: 5px; margin: 10px 0; }
-        .alert-success { background: #d4edda; color: #155724; }
-        .alert-warning { background: #fff3cd; color: #856404; }
-        .alert-danger { background: #f8d7da; color: #721c24; }
-        .alert-info { background: #d1ecf1; color: #0c5460; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            padding: 15px; 
+            min-height: 100vh; 
+        }
+        .container { 
+            max-width: 420px; 
+            margin: 0 auto; 
+            background: white; 
+            border-radius: 16px; 
+            padding: 24px; 
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15); 
+            backdrop-filter: blur(10px);
+        }
+        h1 { 
+            color: #2d3748; 
+            font-size: 24px; 
+            margin-bottom: 8px; 
+            text-align: center;
+        }
+        .subtitle { 
+            color: #718096; 
+            font-size: 14px; 
+            text-align: center; 
+            margin-bottom: 20px; 
+        }
+        .camera-section { 
+            background: #000; 
+            border-radius: 12px; 
+            margin-bottom: 20px; 
+            height: 260px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            border: 2px solid #e2e8f0;
+            overflow: hidden;
+        }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        .btn { 
+            width: 100%; 
+            padding: 14px; 
+            border: none; 
+            border-radius: 10px; 
+            font-size: 15px; 
+            font-weight: 600; 
+            margin: 8px 0; 
+            cursor: pointer; 
+            transition: all 0.2s ease;
+            letter-spacing: 0.5px;
+        }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .btn-primary { background: linear-gradient(45deg, #4299e1, #3182ce); color: white; }
+        .btn-success { background: linear-gradient(45deg, #48bb78, #38a169); color: white; }
+        .btn-warning { background: linear-gradient(45deg, #ed8936, #dd6b20); color: white; }
+        .btn-danger { background: linear-gradient(45deg, #f56565, #e53e3e); color: white; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .form-group { margin: 16px 0; }
+        label { 
+            display: block; 
+            margin-bottom: 6px; 
+            font-weight: 600; 
+            color: #2d3748; 
+            font-size: 14px; 
+        }
+        input, select { 
+            width: 100%; 
+            padding: 12px; 
+            border: 2px solid #e2e8f0; 
+            border-radius: 8px; 
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+        }
+        input:focus, select:focus { 
+            outline: none; 
+            border-color: #4299e1; 
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1); 
+        }
+        .alert { 
+            padding: 12px; 
+            border-radius: 8px; 
+            margin: 12px 0; 
+            font-size: 14px;
+            border: 1px solid transparent;
+        }
+        .alert-success { background: #f0fff4; color: #22543d; border-color: #9ae6b4; }
+        .alert-warning { background: #fffaf0; color: #744210; border-color: #f6e05e; }
+        .alert-danger { background: #fed7d7; color: #742a2a; border-color: #feb2b2; }
+        .alert-info { background: #ebf8ff; color: #2a4365; border-color: #90cdf4; }
         .hidden { display: none; }
-        .status-item { padding: 8px; margin: 5px 0; border-radius: 5px; font-size: 14px; }
-        .status-connected { background: #e8f5e8; color: #2e7d32; }
-        .status-disconnected { background: #ffebee; color: #c62828; }
-        .tabs { display: flex; margin-bottom: 15px; }
-        .tab { flex: 1; padding: 10px; background: #f0f0f0; border: none; cursor: pointer; }
-        .tab.active { background: #007bff; color: white; }
+        .status-item { 
+            padding: 10px; 
+            margin: 8px 0; 
+            border-radius: 8px; 
+            font-size: 13px; 
+            font-weight: 500;
+        }
+        .status-connected { background: #f0fff4; color: #22543d; border: 1px solid #9ae6b4; }
+        .status-disconnected { background: #fed7d7; color: #742a2a; border: 1px solid #feb2b2; }
+        .tabs { 
+            display: flex; 
+            margin-bottom: 16px; 
+            background: #f7fafc; 
+            border-radius: 10px; 
+            padding: 4px;
+        }
+        .tab { 
+            flex: 1; 
+            padding: 10px; 
+            background: transparent; 
+            border: none; 
+            cursor: pointer; 
+            border-radius: 6px; 
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .tab.active { 
+            background: white; 
+            color: #4299e1; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .processing { text-align: center; padding: 20px; background: #f8f9fa; border-radius: 8px; margin: 10px 0; }
-        .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite; }
+        .processing { 
+            text-align: center; 
+            padding: 24px; 
+            background: #f7fafc; 
+            border-radius: 12px; 
+            margin: 16px 0; 
+            border: 2px solid #e2e8f0;
+        }
+        .spinner { 
+            display: inline-block; 
+            width: 24px; 
+            height: 24px; 
+            border: 3px solid #e2e8f0; 
+            border-top: 3px solid #4299e1; 
+            border-radius: 50%; 
+            animation: spin 1s linear infinite; 
+        }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .debug-log { background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 10px 0; max-height: 150px; overflow-y: auto; font-family: monospace; font-size: 11px; }
-        .debug-controls { margin: 10px 0; }
-        .debug-controls button { margin: 5px; padding: 5px 10px; font-size: 12px; }
-        .api-key-info { font-size: 10px; color: #666; margin-top: 5px; font-family: monospace; }
+        .debug-log { 
+            background: #1a202c; 
+            color: #e2e8f0; 
+            border-radius: 8px; 
+            padding: 12px; 
+            margin: 12px 0; 
+            max-height: 150px; 
+            overflow-y: auto; 
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; 
+            font-size: 11px; 
+        }
+        .debug-controls { margin: 12px 0; }
+        .debug-controls button { margin: 4px; padding: 6px 12px; font-size: 12px; }
+        .api-key-info { 
+            font-size: 11px; 
+            color: #718096; 
+            margin-top: 4px; 
+            font-family: monospace; 
+        }
+        .date-preview {
+            font-size: 11px; 
+            color: #718096; 
+            margin-top: 4px;
+            padding: 4px 8px;
+            background: #f7fafc;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .form-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 16px 0;
+            border: 1px solid #e2e8f0;
+        }
+        .save-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        .retry-btn {
+            grid-column: span 2;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🐛 Receipt Scanner</h1>
-        <p>デバッグ版 - 問題特定用</p>
+        <h1>📄 Receipt Scanner</h1>
+        <p class="subtitle">AI OCR + Google Drive - 会計レシート管理</p>
 
         <!-- Debug Controls -->
         <div class="debug-controls">
@@ -153,32 +304,46 @@
         </div>
 
         <!-- Form -->
-        <div id="form-section" class="hidden">
-            <h3>レシート情報</h3>
+        <div id="form-section" class="hidden form-section">
+            <h3 style="color: #2d3748; margin-bottom: 16px;">📝 レシート情報</h3>
             <div id="ai-result-indicator" class="alert alert-success hidden">
                 🤖 AI解析結果（修正可能）
             </div>
             <div class="form-group">
-                <label>日付</label>
+                <label>📅 日付</label>
                 <input type="date" id="date">
+                <div class="date-preview">
+                    ファイル名形式: <span id="date-preview">20220505</span>
+                </div>
             </div>
             <div class="form-group">
-                <label>会社名</label>
-                <input type="text" id="company">
+                <label>🏢 会社名</label>
+                <input type="text" id="company" placeholder="例: ファミリーマート">
             </div>
             <div class="form-group">
-                <label>品名</label>
-                <input type="text" id="item">
+                <label>📋 科目名</label>
+                <select id="category">
+                    <option value="">科目を選択してください</option>
+                    <option value="旅費交通費">🚗 旅費交通費</option>
+                    <option value="会議費">☕ 会議費</option>
+                    <option value="消耗品費">📎 消耗品費</option>
+                    <option value="通信費">📱 通信費</option>
+                    <option value="租税公課">💼 租税公課</option>
+                    <option value="雑費">📦 雑費</option>
+                    <option value="その他">❓ その他</option>
+                </select>
             </div>
             <div class="form-group">
-                <label>価格</label>
-                <input type="number" id="price">
+                <label>💰 価格</label>
+                <input type="number" id="price" placeholder="例: 150">
             </div>
             
             <!-- Save Options -->
-            <button id="save-local-btn" class="btn btn-success">💾 ローカル保存</button>
-            <button id="save-drive-btn" class="btn btn-primary" disabled>☁️ Google Drive保存</button>
-            <button id="retry-ai-btn" class="btn btn-warning">🔄 AI再解析</button>
+            <div class="save-buttons">
+                <button id="save-local-btn" class="btn btn-success">💾 ローカル保存</button>
+                <button id="save-drive-btn" class="btn btn-primary" disabled>☁️ Drive保存</button>
+                <button id="retry-ai-btn" class="btn btn-warning retry-btn">🔄 AI再解析</button>
+            </div>
         </div>
 
         <!-- Results -->
@@ -1225,7 +1390,7 @@
                                 },
                                 {
                                     type: 'text',
-                                    text: 'この画像はレシートです。以下の情報をJSONで抽出してください：\\n\\n1. 日付（YYYY-MM-DD形式）\\n2. 会社名\\n3. 品名（主要商品1つ）\\n4. 価格（合計金額、数字のみ）\\n\\n例：{"date":"2025-06-21","company":"ファミリーマート","item":"コーヒー","price":"150"}\\n\\nJSONのみを返答してください。'
+                                    text: 'この画像はレシートです。以下の情報をJSONで抽出してください：\\n\\n1. 日付（YYYY-MM-DD形式）\\n2. 会社名\\n3. 品名（主要商品1つ、経費科目の推測含む）\\n4. 価格（合計金額、数字のみ）\\n\\n品名は以下の経費科目のいずれかを推測して含めてください：\\n旅費交通費、会議費、消耗品費、通信費、租税公課、雑費、その他\\n\\n例：{"date":"2025-06-21","company":"ファミリーマート","item":"消耗品費","price":"150"}\\n\\nJSONのみを返答してください。'
                                 }
                             ]
                         }]
@@ -1307,8 +1472,11 @@
             debugLog(`📝 フォーム表示 (AI結果: ${isAIResult})`);
             document.getElementById('date').value = data.date || '';
             document.getElementById('company').value = data.company || '';
-            document.getElementById('item').value = data.item || '';
+            document.getElementById('category').value = data.item || ''; // Map item to category
             document.getElementById('price').value = data.price || '';
+            
+            // Update date preview
+            updateDatePreview();
             
             const aiIndicator = document.getElementById('ai-result-indicator');
             if (isAIResult) {
@@ -1319,14 +1487,43 @@
             
             document.getElementById('form-section').classList.remove('hidden');
             document.getElementById('status').textContent = '情報を確認して保存方法を選択してください';
+            
+            // Add event listeners for real-time updates
+            document.getElementById('date').addEventListener('change', updateDatePreview);
+            document.getElementById('company').addEventListener('input', updateFilenamePreview);
+            document.getElementById('category').addEventListener('change', updateFilenamePreview);
+            document.getElementById('price').addEventListener('input', updateFilenamePreview);
+        }
+
+        function updateDatePreview() {
+            const dateInput = document.getElementById('date');
+            const datePreview = document.getElementById('date-preview');
+            
+            if (dateInput.value) {
+                // Convert YYYY-MM-DD to YYYYMMDD
+                const formattedDate = dateInput.value.replace(/-/g, '');
+                datePreview.textContent = formattedDate;
+            } else {
+                datePreview.textContent = '20220505';
+            }
+        }
+
+        function updateFilenamePreview() {
+            // This will be implemented when we add filename preview
+        }
+
+        function formatDateForFilename(dateString) {
+            if (!dateString) return '';
+            // Convert YYYY-MM-DD to YYYYMMDD
+            return dateString.replace(/-/g, '');
         }
 
         function saveDataLocal() {
             debugLog('💾 ローカル保存開始');
             const data = {
-                date: document.getElementById('date').value,
+                date: formatDateForFilename(document.getElementById('date').value),
                 company: document.getElementById('company').value,
-                item: document.getElementById('item').value,
+                category: document.getElementById('category').value,
                 price: document.getElementById('price').value,
                 timestamp: new Date().toISOString(),
                 image: capturedImage
@@ -1336,7 +1533,7 @@
             receipts.push(data);
             localStorage.setItem('receipts', JSON.stringify(receipts));
             
-            const filename = `${data.date}_${data.company}_${data.item}_${data.price}.jpg`;
+            const filename = `${data.date}_${data.company}_${data.category}_${data.price}.jpg`;
             debugLog(`✅ ローカル保存完了: ${filename}`);
             showResult(`💾 ローカル保存完了<br>ファイル名: ${filename}`, 'success');
             resetForm();
@@ -1370,13 +1567,13 @@
             }
 
             const data = {
-                date: document.getElementById('date').value,
+                date: formatDateForFilename(document.getElementById('date').value),
                 company: document.getElementById('company').value,
-                item: document.getElementById('item').value,
+                category: document.getElementById('category').value,
                 price: document.getElementById('price').value
             };
 
-            const filename = `${data.date}_${data.company}_${data.item}_${data.price}.jpg`;
+            const filename = `${data.date}_${data.company}_${data.category}_${data.price}.jpg`;
 
             showProcessing('Google Driveにアップロード中...');
             
