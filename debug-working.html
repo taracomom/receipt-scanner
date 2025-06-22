@@ -103,6 +103,7 @@
                         <option value="">ルートフォルダ（My Drive）</option>
                     </select>
                     <button class="btn btn-warning" onclick="refreshFolders()" style="margin-top: 5px; font-size: 12px; padding: 8px;">🔄 フォルダ更新</button>
+                    <button class="btn btn-info" onclick="debugFolderState()" style="margin-top: 5px; font-size: 12px; padding: 8px;">🔍 フォルダ状態確認</button>
                 </div>
             </div>
         </div>
@@ -566,6 +567,39 @@
 
         function refreshFolders() {
             debugLog('🔄 フォルダ更新');
+            loadFolders();
+        }
+
+        function debugFolderState() {
+            debugLog('🔍 フォルダ状態確認開始');
+            debugLog(`🔑 アクセストークン有無: ${!!accessToken}`);
+            debugLog(`🔗 Drive接続状態: ${driveConnected}`);
+            debugLog(`📁 選択中フォルダID: ${selectedFolderId || '未選択'}`);
+            
+            const select = document.getElementById('folder-select');
+            if (select) {
+                debugLog(`📋 セレクトボックス存在: ✅`);
+                debugLog(`📋 オプション数: ${select.options.length}`);
+                debugLog(`📋 現在の値: ${select.value}`);
+                
+                for (let i = 0; i < select.options.length; i++) {
+                    const option = select.options[i];
+                    debugLog(`📋 ${i + 1}. "${option.text}" (値: "${option.value}")`);
+                }
+                
+                const folderSection = document.getElementById('folder-selection');
+                debugLog(`📂 フォルダ選択セクション表示: ${!folderSection.classList.contains('hidden')}`);
+                
+                // Force show folder selection
+                folderSection.classList.remove('hidden');
+                debugLog('👁️ フォルダ選択セクションを強制表示');
+                
+            } else {
+                debugLog('❌ セレクトボックスが見つかりません');
+            }
+            
+            // Try to load folders again
+            debugLog('🔄 フォルダ再読み込み実行');
             loadFolders();
         }
 
