@@ -102,8 +102,8 @@
                     
                     <!-- Drive type selector -->
                     <div style="margin-bottom: 10px;">
-                        <button id="my-drive-btn" class="btn btn-primary" onclick="switchToMyDrive()" style="font-size: 11px; padding: 6px; width: 48%; margin-right: 2%;">📁 My Drive</button>
-                        <button id="shared-drive-btn" class="btn btn-primary" onclick="switchToSharedDrive()" style="font-size: 11px; padding: 6px; width: 48%;">🤝 共有フォルダ</button>
+                        <button id="my-drive-btn" class="btn btn-primary" onclick="debugLog('🖱️ My Driveボタンクリック'); switchToMyDrive()" style="font-size: 11px; padding: 6px; width: 48%; margin-right: 2%;">📁 My Drive</button>
+                        <button id="shared-drive-btn" class="btn btn-primary" onclick="debugLog('🖱️ 共有フォルダボタンクリック'); switchToSharedDrive()" style="font-size: 11px; padding: 6px; width: 48%;">🤝 共有フォルダ</button>
                     </div>
                     
                     <!-- Breadcrumb navigation -->
@@ -686,8 +686,20 @@
             }
         }
 
-        function switchToMyDrive() {
+        async function switchToMyDrive() {
             debugLog('📁 My Driveに切り替え');
+            
+            // Check token validity first
+            const isValid = await checkTokenValidity();
+            if (!isValid) {
+                debugLog('❌ トークン無効 - 再認証が必要');
+                alert('🔑 Google Drive認証の期限が切れました。\n\n「Drive」タブから再接続してください。');
+                updateDriveStatus(false);
+                // Switch to Drive tab to make reconnection easy
+                showTab('drive');
+                return;
+            }
+            
             currentDriveType = 'my';
             currentFolderId = '';
             folderHistory = [];
@@ -695,8 +707,20 @@
             loadFolders('');
         }
 
-        function switchToSharedDrive() {
+        async function switchToSharedDrive() {
             debugLog('🤝 共有フォルダに切り替え');
+            
+            // Check token validity first
+            const isValid = await checkTokenValidity();
+            if (!isValid) {
+                debugLog('❌ トークン無効 - 再認証が必要');
+                alert('🔑 Google Drive認証の期限が切れました。\n\n「Drive」タブから再接続してください。');
+                updateDriveStatus(false);
+                // Switch to Drive tab to make reconnection easy
+                showTab('drive');
+                return;
+            }
+            
             currentDriveType = 'shared';
             currentFolderId = '';
             folderHistory = [];
@@ -714,6 +738,41 @@
             } else {
                 myDriveBtn.style.background = '#6c757d';
                 sharedDriveBtn.style.background = '#007bff';
+            }
+        }
+
+        async function checkTokenValidity() {
+            if (!accessToken) {
+                debugLog('❌ アクセストークンが存在しません');
+                return false;
+            }
+
+            try {
+                debugLog('🔍 トークン有効性チェック開始');
+                const response = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+                
+                debugLog(`📡 トークンチェック応答: ${response.status}`);
+                
+                if (response.status === 401) {
+                    debugLog('❌ トークン期限切れ');
+                    // Clear expired token
+                    accessToken = null;
+                    localStorage.removeItem('google_access_token');
+                    return false;
+                } else if (response.ok) {
+                    debugLog('✅ トークン有効');
+                    return true;
+                } else {
+                    debugLog(`⚠️ 予期しない応答: ${response.status}`);
+                    return false;
+                }
+            } catch (error) {
+                debugLog(`❌ トークンチェックエラー: ${error.message}`);
+                return false;
             }
         }
 
