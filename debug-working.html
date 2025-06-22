@@ -489,7 +489,7 @@
                 debugLog(`🔑 使用中のアクセストークン: ${accessToken.substring(0, 20)}...`);
                 debugLog('🌐 Google Drive フォルダAPI呼び出し');
                 
-                const response = await fetch('https://www.googleapis.com/drive/v3/files?q=mimeType="application/vnd.google-apps.folder"&pageSize=50&fields=files(id,name)&orderBy=name', {
+                const response = await fetch('https://www.googleapis.com/drive/v3/files?q=mimeType="application/vnd.google-apps.folder"&pageSize=100&fields=files(id,name,parents)', {
                     headers: {
                         'Authorization': `Bearer ${accessToken}`
                     }
@@ -506,26 +506,55 @@
                         debugLog('⚠️ フォルダが0個です。Google Driveに個人フォルダを作成してみてください。');
                     }
                     
-                    // Log folder names for debugging
-                    folders.forEach((folder, index) => {
-                        debugLog(`📂 ${index + 1}. ${folder.name} (${folder.id})`);
-                    });
-                    
                     const select = document.getElementById('folder-select');
                     if (!select) {
                         debugLog('❌ folder-select要素が見つかりません');
                         return;
                     }
                     
+                    // Build folder hierarchy
+                    const folderMap = new Map();
+                    folders.forEach(folder => {
+                        folderMap.set(folder.id, folder);
+                    });
+
+                    // Function to build full path
+                    function getFolderPath(folder, folderMap, visited = new Set()) {
+                        if (visited.has(folder.id)) return folder.name;
+                        visited.add(folder.id);
+                        
+                        if (!folder.parents || folder.parents.length === 0) {
+                            return folder.name;
+                        }
+                        
+                        const parent = folderMap.get(folder.parents[0]);
+                        if (parent) {
+                            return getFolderPath(parent, folderMap, visited) + ' / ' + folder.name;
+                        } else {
+                            return folder.name;
+                        }
+                    }
+
+                    // Sort folders by hierarchy
+                    const foldersWithPaths = folders.map(folder => ({
+                        ...folder,
+                        fullPath: getFolderPath(folder, folderMap)
+                    })).sort((a, b) => a.fullPath.localeCompare(b.fullPath));
+                    
+                    // Log folder hierarchy for debugging
+                    foldersWithPaths.forEach((folder, index) => {
+                        debugLog(`📂 ${index + 1}. ${folder.fullPath} (${folder.id})`);
+                    });
+                    
                     // Clear existing options except root
                     select.innerHTML = '<option value="">ルートフォルダ（My Drive）</option>';
                     
-                    folders.forEach(folder => {
+                    foldersWithPaths.forEach(folder => {
                         const option = document.createElement('option');
                         option.value = folder.id;
-                        option.textContent = folder.name;
+                        option.textContent = folder.fullPath;
                         select.appendChild(option);
-                        debugLog(`➕ オプション追加: ${folder.name}`);
+                        debugLog(`➕ オプション追加: ${folder.fullPath}`);
                     });
 
                     debugLog(`📋 セレクトボックスのオプション数: ${select.options.length}`);
@@ -644,9 +673,9 @@
                     });
                 }
 
-                // Test 3: Folders specifically
-                debugLog('🔬 テスト3: フォルダのみ取得');
-                const folderResponse = await fetch('https://www.googleapis.com/drive/v3/files?q=mimeType="application/vnd.google-apps.folder"&pageSize=20&fields=files(id,name,parents)', {
+                // Test 3: All folders with hierarchy
+                debugLog('🔬 テスト3: 全フォルダ（階層含む）取得');
+                const folderResponse = await fetch('https://www.googleapis.com/drive/v3/files?q=mimeType="application/vnd.google-apps.folder"&pageSize=100&fields=files(id,name,parents)', {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
                 debugLog(`📡 フォルダAPI応答: ${folderResponse.status}`);
@@ -659,28 +688,54 @@
                         debugLog('⚠️ フォルダが0個です！新しいフォルダを作成してください。');
                         alert('Google Driveにフォルダが見つかりません。\\nGoogle Driveで新しいフォルダを作成してから再試行してください。');
                     } else {
-                        folderData.files.forEach((folder, index) => {
-                            debugLog(`📂 ${index + 1}. ${folder.name} (ID: ${folder.id})`);
-                            if (folder.parents) {
-                                debugLog(`   └ 親フォルダ: ${folder.parents.join(', ')}`);
+                        // Build folder hierarchy
+                        const folderMap = new Map();
+                        folderData.files.forEach(folder => {
+                            folderMap.set(folder.id, folder);
+                        });
+
+                        // Function to build full path
+                        function getFolderPath(folder, folderMap, visited = new Set()) {
+                            if (visited.has(folder.id)) return folder.name; // Prevent infinite loops
+                            visited.add(folder.id);
+                            
+                            if (!folder.parents || folder.parents.length === 0) {
+                                return folder.name; // Root level
                             }
+                            
+                            const parent = folderMap.get(folder.parents[0]);
+                            if (parent) {
+                                return getFolderPath(parent, folderMap, visited) + ' / ' + folder.name;
+                            } else {
+                                return folder.name; // Parent not in our list (might be outside scope)
+                            }
+                        }
+
+                        // Sort folders by hierarchy and display
+                        const foldersWithPaths = folderData.files.map(folder => ({
+                            ...folder,
+                            fullPath: getFolderPath(folder, folderMap)
+                        })).sort((a, b) => a.fullPath.localeCompare(b.fullPath));
+
+                        foldersWithPaths.forEach((folder, index) => {
+                            debugLog(`📂 ${index + 1}. ${folder.fullPath} (ID: ${folder.id})`);
                         });
                         
-                        // Test 4: Manual dropdown update
-                        debugLog('🔬 テスト4: 手動ドロップダウン更新');
+                        // Test 4: Manual dropdown update with hierarchy
+                        debugLog('🔬 テスト4: 階層表示ドロップダウン更新');
                         const select = document.getElementById('folder-select');
                         select.innerHTML = '<option value="">ルートフォルダ（My Drive）</option>';
                         
-                        folderData.files.forEach((folder, index) => {
+                        foldersWithPaths.forEach(folder => {
                             const option = document.createElement('option');
                             option.value = folder.id;
-                            option.textContent = `${folder.name}`;
+                            option.textContent = folder.fullPath;
                             select.appendChild(option);
-                            debugLog(`➕ 手動追加: ${folder.name}`);
+                            debugLog(`➕ 階層追加: ${folder.fullPath}`);
                         });
                         
-                        debugLog(`✅ 手動ドロップダウン更新完了: ${select.options.length}個のオプション`);
-                        alert(`フォルダ取得成功！${folderData.files.length}個のフォルダをドロップダウンに追加しました。`);
+                        debugLog(`✅ 階層ドロップダウン更新完了: ${select.options.length}個のオプション`);
+                        alert(`フォルダ取得成功！${folderData.files.length}個のフォルダ（階層表示）をドロップダウンに追加しました。`);
                     }
                 } else {
                     const errorText = await folderResponse.text();
