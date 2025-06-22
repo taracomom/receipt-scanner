@@ -23,6 +23,12 @@
         <button onclick="stopCamera()">カメラ停止</button>
         <button onclick="clearLog()">ログクリア</button>
     </div>
+    <div style="margin-top: 10px;">
+        <button onclick="checkEnvironment()">環境再チェック</button>
+        <button onclick="listDevices()">デバイス一覧</button>
+        <button onclick="forcePermissionRequest()" style="background: #ff6b6b; color: white;">🚨 強制権限リクエスト</button>
+        <button onclick="showPermissionHelp()">権限設定ヘルプ</button>
+    </div>
     
     <div id="status">カメラテスト準備完了</div>
     <div id="log" class="log"></div>
@@ -115,11 +121,130 @@
             }
         }
 
+        // 詳細な環境チェック
+        function checkEnvironment() {
+            addLog('📱 カメラテストページ読み込み完了');
+            addLog(`🌐 ブラウザ: ${navigator.userAgent}`);
+            addLog(`📍 URL: ${window.location.href}`);
+            addLog(`🔒 プロトコル: ${window.location.protocol}`);
+            addLog(`📷 MediaDevices対応: ${!!navigator.mediaDevices}`);
+            addLog(`🎥 getUserMedia対応: ${!!navigator.mediaDevices?.getUserMedia}`);
+            
+            // Check if HTTPS
+            if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+                addLog('❌ HTTPS必須: カメラアクセスにはHTTPS接続が必要です');
+                updateStatus('エラー: HTTPS接続が必要');
+                return false;
+            }
+            
+            // Check permissions API
+            if ('permissions' in navigator) {
+                navigator.permissions.query({name: 'camera'}).then(result => {
+                    addLog(`🔐 カメラ権限状態: ${result.state}`);
+                    if (result.state === 'denied') {
+                        addLog('❌ カメラアクセスが拒否されています');
+                        addLog('💡 解決方法: ブラウザのアドレスバー左側の🔒マークをクリック→カメラ→許可');
+                        updateStatus('カメラアクセス拒否 - ブラウザ設定を確認してください');
+                    }
+                }).catch(err => {
+                    addLog(`⚠️ 権限チェックエラー: ${err.message}`);
+                });
+            }
+            
+            return true;
+        }
+
+        // デバイス一覧取得
+        async function listDevices() {
+            try {
+                addLog('📱 メディアデバイス一覧取得中...');
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                
+                addLog(`📹 検出されたカメラ数: ${videoDevices.length}`);
+                videoDevices.forEach((device, index) => {
+                    addLog(`📹 カメラ${index + 1}: ${device.label || 'Unknown Camera'} (ID: ${device.deviceId})`);
+                });
+                
+                if (videoDevices.length === 0) {
+                    addLog('❌ カメラデバイスが見つかりません');
+                    updateStatus('カメラデバイスなし');
+                }
+            } catch (error) {
+                addLog(`❌ デバイス一覧取得エラー: ${error.message}`);
+            }
+        }
+
+        // 権限設定ヘルプ
+        function showPermissionHelp() {
+            const helpText = `
+📋 カメラ権限設定方法:
+
+🔴 Chrome/Edge:
+1. アドレスバー左の🔒マークをクリック
+2. 「カメラ」を「許可」に変更
+3. ページを更新
+
+🔴 Safari:
+1. Safari → 設定 → Webサイト → カメラ
+2. このサイトを「許可」に設定
+3. ページを更新
+
+🔴 Firefox:
+1. アドレスバー左の🔒マークをクリック
+2. 「接続の詳細」→「その他の情報」
+3. 「許可設定」でカメラを許可
+
+🔴 モバイル:
+- ブラウザアプリの設定でカメラ権限を許可
+- デバイス設定でブラウザのカメラアクセスを許可
+
+現在のURL: ${window.location.href}
+            `;
+            
+            alert(helpText);
+            addLog('💡 権限設定ヘルプを表示しました');
+        }
+
+        // より積極的なカメラテスト
+        async function forcePermissionRequest() {
+            addLog('🚨 強制的な権限リクエスト開始');
+            
+            try {
+                // Try to trigger permission dialog
+                updateStatus('権限ダイアログを表示しています...');
+                
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { min: 1 },
+                        height: { min: 1 }
+                    } 
+                });
+                
+                addLog('✅ 権限取得成功');
+                video.srcObject = stream;
+                currentStream = stream;
+                updateStatus('カメラ動作中');
+                
+            } catch (error) {
+                addLog(`❌ 権限リクエストエラー: ${error.name} - ${error.message}`);
+                
+                if (error.name === 'NotAllowedError') {
+                    addLog('🚫 ユーザーがカメラアクセスを拒否しました');
+                    showPermissionHelp();
+                } else if (error.name === 'NotFoundError') {
+                    addLog('📷 カメラデバイスが見つかりません');
+                } else {
+                    addLog(`❓ 不明なエラー: ${error.name}`);
+                }
+                
+                updateStatus(`エラー: ${error.message}`);
+            }
+        }
+
         // 初期化
-        addLog('📱 カメラテストページ読み込み完了');
-        addLog(`🌐 ブラウザ: ${navigator.userAgent}`);
-        addLog(`📷 MediaDevices対応: ${!!navigator.mediaDevices}`);
-        addLog(`🎥 getUserMedia対応: ${!!navigator.mediaDevices?.getUserMedia}`);
+        checkEnvironment();
+        listDevices();
     </script>
 </body>
 </html>
