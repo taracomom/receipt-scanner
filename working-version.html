@@ -284,11 +284,16 @@
             }
 
             const currentUrl = window.location.href.split('#')[0].split('?')[0];
+            console.log('Current URL:', currentUrl);
+            
             const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
                 `client_id=${clientId}&` +
                 `response_type=token&` +
                 `scope=${encodeURIComponent(SCOPES)}&` +
                 `redirect_uri=${encodeURIComponent(currentUrl)}`;
+
+            // Show redirect URI to user for Google Cloud Console setup
+            alert(`Google Cloud Consoleで以下のリダイレクトURIを追加してください：\n\n${currentUrl}\n\n設定後、OKを押して認証を開始します。`);
 
             window.location.href = authUrl;
         }
