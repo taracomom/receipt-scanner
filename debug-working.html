@@ -269,7 +269,7 @@
 
         <!-- Camera Section -->
         <div class="camera-section">
-            <div class="camera-overlay">レシートをここに映してください</div>
+            <div class="camera-overlay" id="camera-overlay">カメラを初期化中...</div>
             <video id="video" autoplay playsinline muted></video>
             <canvas id="canvas" class="hidden"></canvas>
         </div>
@@ -411,8 +411,9 @@
                         
                         <!-- Debug buttons -->
                         <div style="margin-top: 5px;">
-                            <button class="btn btn-info" onclick="debugFolderState()" style="font-size: 10px; padding: 5px; width: 48%; margin-right: 2%;">🔍 状態確認</button>
-                            <button class="btn btn-success" onclick="testApiDirectly()" style="font-size: 10px; padding: 5px; width: 48%;">🧪 APIテスト</button>
+                            <button class="btn btn-info" onclick="debugFolderState()" style="font-size: 10px; padding: 5px; width: 32%; margin-right: 1%;">🔍 状態確認</button>
+                            <button class="btn btn-success" onclick="testApiDirectly()" style="font-size: 10px; padding: 5px; width: 32%; margin-right: 1%;">🧪 APIテスト</button>
+                            <button class="btn btn-warning" onclick="testCamera()" style="font-size: 10px; padding: 5px; width: 32%;">📷 カメラテスト</button>
                         </div>
                     </div>
                 </div>
@@ -537,9 +538,16 @@
         async function initCamera() {
             debugLog('📷 カメラ初期化開始');
             const status = document.getElementById('status');
+            const overlay = document.getElementById('camera-overlay');
             
             try {
                 status.textContent = 'カメラを初期化中...';
+                overlay.textContent = 'カメラ許可を確認中...';
+                
+                // Check if getUserMedia is supported
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('このブラウザはカメラ機能に対応していません');
+                }
                 
                 const constraints = {
                     video: { 
@@ -550,27 +558,55 @@
                 };
                 
                 debugLog('📷 getUserMedia呼び出し');
+                debugLog(`🔧 制約: ${JSON.stringify(constraints)}`);
+                
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 
                 video.srcObject = stream;
                 cameraAvailable = true;
                 debugLog('✅ カメラストリーム取得成功');
+                debugLog(`📺 ビデオトラック数: ${stream.getVideoTracks().length}`);
+                
+                // Update overlay and wait for video to load
+                overlay.textContent = '動画を読み込み中...';
                 
                 video.onloadedmetadata = () => {
                     debugLog('📹 カメラメタデータ読み込み完了');
+                    debugLog(`📐 ビデオサイズ: ${video.videoWidth}x${video.videoHeight}`);
+                    
+                    overlay.textContent = 'レシートをここに映してください';
                     document.getElementById('capture-btn').disabled = false;
                     updateMainStatus();
                 };
                 
+                video.onerror = (e) => {
+                    debugLog(`❌ ビデオエラー: ${e.message || e}`);
+                    overlay.textContent = 'カメラエラーが発生しました';
+                };
+                
             } catch (error) {
                 debugLog(`❌ カメラエラー: ${error.message}`);
+                debugLog(`🔍 エラータイプ: ${error.name}`);
                 cameraAvailable = false;
                 
-                document.getElementById('file-input').style.display = 'block';
-                document.getElementById('capture-btn').style.display = 'none';
-                video.style.display = 'none';
+                // Show appropriate error message
+                let errorMessage = 'カメラを利用できません。';
+                if (error.name === 'NotAllowedError') {
+                    errorMessage = 'カメラへのアクセスが拒否されました。ブラウザの設定でカメラ許可をしてください。';
+                    overlay.textContent = 'カメラアクセスが拒否されました';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage = 'カメラが見つかりませんでした。';
+                    overlay.textContent = 'カメラが見つかりません';
+                } else {
+                    overlay.textContent = 'カメラエラー';
+                }
                 
-                status.textContent = 'カメラを利用できません。ファイルを選択してください';
+                document.getElementById('file-input').style.display = 'block';
+                document.getElementById('capture-btn').textContent = '📁 ファイルを選択して解析';
+                document.getElementById('capture-btn').disabled = false;
+                document.getElementById('capture-btn').onclick = () => document.getElementById('file-input').click();
+                
+                status.textContent = errorMessage;
                 status.className = 'alert alert-warning';
             }
         }
@@ -1199,6 +1235,36 @@
             loadFolders();
         }
 
+        function testCamera() {
+            debugLog('📷 カメラテスト開始');
+            
+            debugLog(`📺 カメラ利用可能: ${cameraAvailable}`);
+            debugLog(`📹 ビデオ要素: ${!!video}`);
+            debugLog(`📐 ビデオサイズ: ${video.videoWidth}x${video.videoHeight}`);
+            debugLog(`🎬 ビデオ準備状態: ${video.readyState}`);
+            debugLog(`▶️ ビデオ再生中: ${!video.paused}`);
+            debugLog(`🔇 ビデオミュート: ${video.muted}`);
+            
+            if (video.srcObject) {
+                const tracks = video.srcObject.getVideoTracks();
+                debugLog(`🎞️ ビデオトラック数: ${tracks.length}`);
+                tracks.forEach((track, index) => {
+                    debugLog(`🎞️ トラック${index + 1}: ${track.label}, 有効: ${track.enabled}, 状態: ${track.readyState}`);
+                });
+            } else {
+                debugLog('❌ ビデオストリームなし');
+            }
+            
+            // Force video play attempt
+            video.play().then(() => {
+                debugLog('✅ ビデオ再生成功');
+            }).catch(error => {
+                debugLog(`❌ ビデオ再生エラー: ${error.message}`);
+            });
+            
+            alert('カメラテスト完了。デバッグログを確認してください。');
+        }
+
         async function testApiDirectly() {
             debugLog('🧪 API直接テスト開始');
             
@@ -1372,20 +1438,48 @@
         function capturePhoto() {
             debugLog('📸 撮影ボタンクリック');
             
-            if (!cameraAvailable || isProcessing) {
-                debugLog('❌ 撮影不可 (カメラ利用不可 または 処理中)');
+            if (isProcessing) {
+                debugLog('⚠️ 処理中のためスキップ');
+                return;
+            }
+            
+            if (!cameraAvailable) {
+                debugLog('📁 カメラ未対応のためファイル選択モードに切り替え');
+                document.getElementById('file-input').click();
+                return;
+            }
+            
+            // Check if video is actually playing
+            if (!video.videoWidth || !video.videoHeight || video.readyState < 2) {
+                debugLog('⚠️ ビデオデータが不十分です');
+                debugLog(`📺 ビデオ状態: width=${video.videoWidth}, height=${video.videoHeight}, readyState=${video.readyState}`);
+                showResult('カメラの準備ができていません。しばらく待ってから再試行してください。', 'warning');
                 return;
             }
             
             try {
                 debugLog('🎨 Canvas描画開始');
+                debugLog(`📺 ビデオサイズ: ${video.videoWidth}x${video.videoHeight}`);
+                
                 const ctx = canvas.getContext('2d');
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
+                
+                if (canvas.width === 0 || canvas.height === 0) {
+                    throw new Error('ビデオサイズが無効です');
+                }
+                
                 ctx.drawImage(video, 0, 0);
                 
                 capturedImage = canvas.toDataURL('image/jpeg', 0.8);
                 debugLog(`📷 画像キャプチャ完了 (${capturedImage.length}文字)`);
+                
+                // Visual feedback
+                const overlay = document.getElementById('camera-overlay');
+                overlay.textContent = '📸 撮影完了！';
+                setTimeout(() => {
+                    overlay.textContent = 'レシートをここに映してください';
+                }, 1000);
                 
                 if (openaiConfigured) {
                     debugLog('🤖 AI処理モードで実行');
@@ -1396,7 +1490,7 @@
                 }
             } catch (error) {
                 debugLog(`❌ 撮影エラー: ${error.message}`);
-                showResult('撮影に失敗しました', 'danger');
+                showResult('撮影に失敗しました: ' + error.message, 'danger');
             }
         }
 
