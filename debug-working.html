@@ -39,12 +39,24 @@
             background: #000; 
             border-radius: 12px; 
             margin-bottom: 20px; 
-            height: 260px; 
+            height: 400px; 
             display: flex; 
             align-items: center; 
             justify-content: center; 
             border: 2px solid #e2e8f0;
             overflow: hidden;
+            position: relative;
+        }
+        .camera-overlay {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 10;
         }
         video { width: 100%; height: 100%; object-fit: cover; }
         .btn { 
@@ -193,6 +205,55 @@
         .retry-btn {
             grid-column: span 2;
         }
+        .settings-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            margin: 16px 0;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+        }
+        .settings-header {
+            padding: 12px 16px;
+            background: #e2e8f0;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            color: #4a5568;
+        }
+        .settings-header:hover {
+            background: #cbd5e0;
+        }
+        .settings-content {
+            padding: 16px;
+            display: none;
+        }
+        .settings-content.active {
+            display: block;
+        }
+        .toggle-icon {
+            transition: transform 0.2s ease;
+        }
+        .toggle-icon.rotated {
+            transform: rotate(180deg);
+        }
+        .main-actions {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 16px 0;
+            border: 2px solid #e2e8f0;
+        }
+        .folder-indicator {
+            background: #e6fffa;
+            border: 1px solid #81e6d9;
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin: 8px 0;
+            font-size: 13px;
+            color: #234e52;
+        }
     </style>
 </head>
 <body>
@@ -200,91 +261,15 @@
         <h1>📄 Receipt Scanner</h1>
         <p class="subtitle">AI OCR + Google Drive - 会計レシート管理</p>
 
-        <!-- Debug Controls -->
-        <div class="debug-controls">
-            <button class="btn btn-warning" onclick="clearDebugLog()" style="width: 48%; margin: 1%;">ログクリア</button>
-            <button class="btn btn-info" onclick="toggleDebugLog()" style="width: 48%; margin: 1%;">ログ表示切替</button>
-        </div>
-
-        <!-- Debug Log -->
-        <div id="debug-log" class="debug-log"></div>
-
-        <!-- Status Overview -->
-        <div id="status-overview">
-            <div id="openai-status" class="status-item status-disconnected">
-                <strong>🤖 OpenAI API:</strong> 未設定
-            </div>
-            <div id="drive-status" class="status-item status-disconnected">
-                <strong>☁️ Google Drive:</strong> 未接続
-            </div>
-        </div>
-
-        <!-- Settings Tabs -->
-        <div class="tabs">
-            <button class="tab active" onclick="showTab('openai')">OpenAI</button>
-            <button class="tab" onclick="showTab('drive')">Drive</button>
-        </div>
-
-        <div id="openai-tab" class="tab-content active">
-            <h3>OpenAI API設定</h3>
-            <div class="form-group">
-                <label>API Key</label>
-                <input type="password" id="openai-api-key" placeholder="sk-proj-..." style="font-family: monospace; font-size: 12px;" oninput="updateApiKeyInfo()">
-                <button class="btn btn-primary" onclick="saveOpenAIKey()">保存</button>
-                <div id="api-key-info" class="api-key-info">
-                    キー長: 0文字 | 形式: 未確認
-                </div>
-            </div>
-        </div>
-
-        <div id="drive-tab" class="tab-content">
-            <h3>Google Drive設定</h3>
-            <div class="form-group">
-                <label>Google Client ID</label>
-                <input type="text" id="google-client-id" placeholder="123456789-abcd.apps.googleusercontent.com" value="255333114465-961rhoiiscu1iu72f1m5blege4ks9ijk.apps.googleusercontent.com">
-                <button class="btn btn-primary" onclick="saveClientId()">保存</button>
-            </div>
-            <button id="connect-drive-btn" class="btn btn-primary" onclick="connectGoogleDrive()">🔗 Google Drive接続</button>
-            <button class="btn btn-danger" onclick="forceClearAuth()" style="margin-top: 5px; font-size: 12px; padding: 8px;">🗑️ 認証完全クリア</button>
-            
-            <div id="folder-selection" class="hidden" style="margin-top: 15px;">
-                <div class="form-group">
-                    <label>保存先フォルダ</label>
-                    
-                    <!-- Drive type selector -->
-                    <div style="margin-bottom: 10px;">
-                        <button id="my-drive-btn" class="btn btn-primary" onclick="debugLog('🖱️ My Driveボタンクリック'); switchToMyDrive()" style="font-size: 11px; padding: 6px; width: 48%; margin-right: 2%;">📁 My Drive</button>
-                        <button id="shared-drive-btn" class="btn btn-primary" onclick="debugLog('🖱️ 共有フォルダボタンクリック'); switchToSharedDrive()" style="font-size: 11px; padding: 6px; width: 48%;">🤝 共有フォルダ</button>
-                    </div>
-                    
-                    <!-- Breadcrumb navigation -->
-                    <div id="folder-breadcrumb" style="background: #f8f9fa; padding: 8px; border-radius: 5px; margin-bottom: 10px; font-size: 12px; min-height: 24px;">
-                        <span id="breadcrumb-text">📁 My Drive</span>
-                        <button id="back-button" onclick="goBackFolder()" style="float: right; background: #6c757d; color: white; border: none; padding: 2px 8px; border-radius: 3px; font-size: 10px; display: none;">← 戻る</button>
-                    </div>
-                    
-                    <!-- Current level folders -->
-                    <select id="folder-select" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
-                        <option value="">このフォルダに保存</option>
-                    </select>
-                    
-                    <!-- Navigation buttons -->
-                    <div style="margin-top: 10px;">
-                        <button id="enter-folder-btn" class="btn btn-primary" onclick="enterSelectedFolder()" style="font-size: 12px; padding: 8px; width: 48%; margin-right: 2%;" disabled>📂 フォルダを開く</button>
-                        <button class="btn btn-warning" onclick="refreshFolders()" style="font-size: 12px; padding: 8px; width: 48%;">🔄 更新</button>
-                    </div>
-                    
-                    <!-- Debug buttons -->
-                    <div style="margin-top: 5px;">
-                        <button class="btn btn-info" onclick="debugFolderState()" style="font-size: 10px; padding: 5px; width: 48%; margin-right: 2%;">🔍 状態確認</button>
-                        <button class="btn btn-success" onclick="testApiDirectly()" style="font-size: 10px; padding: 5px; width: 48%;">🧪 APIテスト</button>
-                    </div>
-                </div>
-            </div>
+        <!-- Current folder indicator -->
+        <div id="current-folder-indicator" class="folder-indicator hidden">
+            📁 保存先: <span id="current-folder-name">My Drive</span>
+            <button onclick="toggleSettings('folder')" style="background: none; border: none; color: #2d5a4d; cursor: pointer; float: right;">変更</button>
         </div>
 
         <!-- Camera Section -->
         <div class="camera-section">
+            <div class="camera-overlay">レシートをここに映してください</div>
             <video id="video" autoplay playsinline muted></video>
             <canvas id="canvas" class="hidden"></canvas>
         </div>
@@ -293,7 +278,10 @@
         <input type="file" id="file-input" accept="image/*" capture="environment" class="btn btn-primary" style="display: none;">
 
         <!-- Main Action Button -->
-        <button id="capture-btn" class="btn btn-primary" disabled>📷 撮影してAI解析</button>
+        <div class="main-actions">
+            <button id="capture-btn" class="btn btn-primary" disabled>📷 撮影してAI解析</button>
+            <div id="status" class="alert alert-warning">初期化中...</div>
+        </div>
 
         <!-- Processing Indicator -->
         <div id="processing-indicator" class="processing hidden">
@@ -340,15 +328,110 @@
             
             <!-- Save Options -->
             <div class="save-buttons">
-                <button id="save-local-btn" class="btn btn-success">💾 ローカル保存</button>
-                <button id="save-drive-btn" class="btn btn-primary" disabled>☁️ Drive保存</button>
-                <button id="retry-ai-btn" class="btn btn-warning retry-btn">🔄 AI再解析</button>
+                <button id="save-btn" class="btn btn-primary">💾 保存</button>
+                <button id="retry-ai-btn" class="btn btn-warning">🔄 AI再解析</button>
             </div>
         </div>
 
         <!-- Results -->
         <div id="results"></div>
-        <div id="status" class="alert alert-warning">初期化中...</div>
+
+        <!-- Settings Sections (Collapsible) -->
+        <div class="settings-section">
+            <div class="settings-header" onclick="toggleSettings('api')">
+                <span>🤖 OpenAI API設定</span>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div id="api-settings" class="settings-content">
+                <div id="openai-status" class="status-item status-disconnected">
+                    <strong>🤖 OpenAI API:</strong> 未設定
+                </div>
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="password" id="openai-api-key" placeholder="sk-proj-..." style="font-family: monospace; font-size: 12px;" oninput="updateApiKeyInfo()">
+                    <button class="btn btn-primary" onclick="saveOpenAIKey()">保存</button>
+                    <div id="api-key-info" class="api-key-info">
+                        キー長: 0文字 | 形式: 未確認
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-header" onclick="toggleSettings('drive')">
+                <span>☁️ Google Drive設定</span>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div id="drive-settings" class="settings-content">
+                <div id="drive-status" class="status-item status-disconnected">
+                    <strong>☁️ Google Drive:</strong> 未接続
+                </div>
+                <div class="form-group">
+                    <label>Google Client ID</label>
+                    <input type="text" id="google-client-id" placeholder="123456789-abcd.apps.googleusercontent.com" value="255333114465-961rhoiiscu1iu72f1m5blege4ks9ijk.apps.googleusercontent.com">
+                    <button class="btn btn-primary" onclick="saveClientId()">保存</button>
+                </div>
+                <button id="connect-drive-btn" class="btn btn-primary" onclick="connectGoogleDrive()">🔗 Google Drive接続</button>
+                <button class="btn btn-danger" onclick="forceClearAuth()" style="margin-top: 5px; font-size: 12px; padding: 8px;">🗑️ 認証完全クリア</button>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-header" onclick="toggleSettings('folder')">
+                <span>📁 フォルダ選択</span>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div id="folder-settings" class="settings-content">
+                <div id="folder-selection" style="margin-top: 15px;">
+                    <div class="form-group">
+                        <label>保存先フォルダ</label>
+                        
+                        <!-- Drive type selector -->
+                        <div style="margin-bottom: 10px;">
+                            <button id="my-drive-btn" class="btn btn-primary" onclick="debugLog('🖱️ My Driveボタンクリック'); switchToMyDrive()" style="font-size: 11px; padding: 6px; width: 48%; margin-right: 2%;">📁 My Drive</button>
+                            <button id="shared-drive-btn" class="btn btn-primary" onclick="debugLog('🖱️ 共有フォルダボタンクリック'); switchToSharedDrive()" style="font-size: 11px; padding: 6px; width: 48%;">🤝 共有フォルダ</button>
+                        </div>
+                        
+                        <!-- Breadcrumb navigation -->
+                        <div id="folder-breadcrumb" style="background: #f8f9fa; padding: 8px; border-radius: 5px; margin-bottom: 10px; font-size: 12px; min-height: 24px;">
+                            <span id="breadcrumb-text">📁 My Drive</span>
+                            <button id="back-button" onclick="goBackFolder()" style="float: right; background: #6c757d; color: white; border: none; padding: 2px 8px; border-radius: 3px; font-size: 10px; display: none;">← 戻る</button>
+                        </div>
+                        
+                        <!-- Current level folders -->
+                        <select id="folder-select" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                            <option value="">このフォルダに保存</option>
+                        </select>
+                        
+                        <!-- Navigation buttons -->
+                        <div style="margin-top: 10px;">
+                            <button id="enter-folder-btn" class="btn btn-primary" onclick="enterSelectedFolder()" style="font-size: 12px; padding: 8px; width: 48%; margin-right: 2%;" disabled>📂 フォルダを開く</button>
+                            <button class="btn btn-warning" onclick="refreshFolders()" style="font-size: 12px; padding: 8px; width: 48%;">🔄 更新</button>
+                        </div>
+                        
+                        <!-- Debug buttons -->
+                        <div style="margin-top: 5px;">
+                            <button class="btn btn-info" onclick="debugFolderState()" style="font-size: 10px; padding: 5px; width: 48%; margin-right: 2%;">🔍 状態確認</button>
+                            <button class="btn btn-success" onclick="testApiDirectly()" style="font-size: 10px; padding: 5px; width: 48%;">🧪 APIテスト</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-header" onclick="toggleSettings('debug')">
+                <span>🐛 デバッグ</span>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div id="debug-settings" class="settings-content">
+                <div class="debug-controls">
+                    <button class="btn btn-warning" onclick="clearDebugLog()" style="width: 48%; margin: 1%;">ログクリア</button>
+                    <button class="btn btn-info" onclick="toggleDebugLog()" style="width: 48%; margin: 1%;">ログ表示切替</button>
+                </div>
+                <div id="debug-log" class="debug-log"></div>
+            </div>
+        </div>
     </div>
 
     <!-- Google APIs -->
@@ -622,7 +705,8 @@
                 setTimeout(() => {
                     debugLog('🔄 接続後自動フォルダ読み込み');
                     updateDriveButtons(); // Initialize button states
-                    loadFolders();
+                    updateCurrentFolderDisplay();
+                    loadRememberedFolder(); // Load remembered folder instead of default
                 }, 1000);
             } else {
                 statusEl.className = 'status-item status-disconnected';
@@ -828,6 +912,9 @@
             } else {
                 loadSharedFolders(selectedValue);
             }
+            
+            // Update folder memory
+            updateCurrentFolderDisplay();
         }
 
         function goBackFolder() {
@@ -869,6 +956,7 @@
             currentFolderId = '';
             folderHistory = [];
             updateDriveButtons();
+            updateCurrentFolderDisplay();
             loadFolders('');
         }
 
@@ -890,6 +978,7 @@
             currentFolderId = '';
             folderHistory = [];
             updateDriveButtons();
+            updateCurrentFolderDisplay();
             loadSharedFolders('');
         }
 
@@ -1676,11 +1765,112 @@
             `;
         }
 
+        // Settings toggle functionality
+        function toggleSettings(sectionName) {
+            const content = document.getElementById(`${sectionName}-settings`);
+            const header = content.previousElementSibling;
+            const icon = header.querySelector('.toggle-icon');
+            
+            if (content.classList.contains('active')) {
+                content.classList.remove('active');
+                icon.classList.remove('rotated');
+            } else {
+                // Close all other sections first
+                document.querySelectorAll('.settings-content').forEach(section => {
+                    section.classList.remove('active');
+                });
+                document.querySelectorAll('.toggle-icon').forEach(iconEl => {
+                    iconEl.classList.remove('rotated');
+                });
+                
+                // Open the selected section
+                content.classList.add('active');
+                icon.classList.add('rotated');
+            }
+        }
+
+        // Folder memory functionality
+        function updateCurrentFolderDisplay() {
+            const indicator = document.getElementById('current-folder-indicator');
+            const folderName = document.getElementById('current-folder-name');
+            
+            if (driveConnected) {
+                indicator.classList.remove('hidden');
+                const breadcrumbText = document.getElementById('breadcrumb-text');
+                if (breadcrumbText) {
+                    folderName.textContent = breadcrumbText.textContent;
+                } else {
+                    folderName.textContent = currentDriveType === 'my' ? 'My Drive' : '共有フォルダ';
+                }
+                
+                // Save current folder selection
+                localStorage.setItem('remember_drive_type', currentDriveType);
+                localStorage.setItem('remember_folder_id', selectedFolderId);
+                localStorage.setItem('remember_folder_name', folderName.textContent);
+            } else {
+                indicator.classList.add('hidden');
+            }
+        }
+
+        // Load remembered folder settings
+        function loadRememberedFolder() {
+            const rememberedDriveType = localStorage.getItem('remember_drive_type');
+            const rememberedFolderId = localStorage.getItem('remember_folder_id');
+            const rememberedFolderName = localStorage.getItem('remember_folder_name');
+            
+            if (rememberedDriveType && driveConnected) {
+                debugLog(`📁 フォルダ設定を復元: ${rememberedDriveType} - ${rememberedFolderName}`);
+                currentDriveType = rememberedDriveType;
+                selectedFolderId = rememberedFolderId || '';
+                
+                updateDriveButtons();
+                updateCurrentFolderDisplay();
+                
+                // Load the appropriate folder view
+                if (currentDriveType === 'my') {
+                    loadFolders(rememberedFolderId);
+                } else {
+                    loadSharedFolders(rememberedFolderId);
+                }
+            }
+        }
+
+        // Unified save function
+        async function saveData() {
+            debugLog('💾 統一保存処理開始');
+            
+            if (!driveConnected) {
+                alert('Google Driveに接続してから保存してください。');
+                toggleSettings('drive');
+                return;
+            }
+
+            const data = {
+                date: formatDateForFilename(document.getElementById('date').value),
+                company: document.getElementById('company').value,
+                category: document.getElementById('category').value,
+                price: document.getElementById('price').value,
+                timestamp: new Date().toISOString(),
+                image: capturedImage
+            };
+
+            const filename = `${data.date}_${data.company}_${data.category}_${data.price}.jpg`;
+
+            try {
+                await saveDataDrive();
+                // Also save locally as backup
+                const receipts = JSON.parse(localStorage.getItem('receipts') || '[]');
+                receipts.push(data);
+                localStorage.setItem('receipts', JSON.stringify(receipts));
+            } catch (error) {
+                debugLog(`❌ 保存エラー: ${error.message}`);
+            }
+        }
+
         // Event listeners
         document.getElementById('capture-btn').addEventListener('click', capturePhoto);
         document.getElementById('file-input').addEventListener('change', handleFileInput);
-        document.getElementById('save-local-btn').addEventListener('click', saveDataLocal);
-        document.getElementById('save-drive-btn').addEventListener('click', saveDataDrive);
+        document.getElementById('save-btn').addEventListener('click', saveData);
         document.getElementById('retry-ai-btn').addEventListener('click', retryAI);
 
         // Initialize
