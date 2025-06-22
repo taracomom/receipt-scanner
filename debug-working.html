@@ -781,6 +781,25 @@
                 return;
             }
 
+            // Check if token is still valid by testing with a simple API call
+            try {
+                const testResponse = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+                
+                if (testResponse.status === 401) {
+                    debugLog('🔄 アクセストークン期限切れ、再認証が必要');
+                    localStorage.removeItem('google_access_token');
+                    updateDriveStatus(false);
+                    alert('Google Drive認証の期限が切れました。再度接続してください。');
+                    return;
+                }
+            } catch (error) {
+                debugLog(`❌ トークン確認エラー: ${error.message}`);
+            }
+
             const data = {
                 date: document.getElementById('date').value,
                 company: document.getElementById('company').value,
@@ -844,6 +863,11 @@
                     showResult(`☁️ Google Drive保存完了<br>ファイル名: ${filename}<br>ファイルID: ${result.id}`, 'success');
                     saveDataLocal(); // Also save locally as backup
                     resetForm();
+                } else if (response.status === 401) {
+                    debugLog('🔄 アップロード中に認証エラー、再認証が必要');
+                    localStorage.removeItem('google_access_token');
+                    updateDriveStatus(false);
+                    throw new Error('認証の期限が切れました。再度Google Driveに接続してください。');
                 } else {
                     const errorText = await response.text();
                     debugLog(`❌ Drive保存エラー: ${response.status} - ${errorText}`);
