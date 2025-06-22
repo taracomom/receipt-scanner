@@ -100,6 +100,12 @@
                 <div class="form-group">
                     <label>保存先フォルダ</label>
                     
+                    <!-- Drive type selector -->
+                    <div style="margin-bottom: 10px;">
+                        <button id="my-drive-btn" class="btn btn-primary" onclick="switchToMyDrive()" style="font-size: 11px; padding: 6px; width: 48%; margin-right: 2%;">📁 My Drive</button>
+                        <button id="shared-drive-btn" class="btn btn-primary" onclick="switchToSharedDrive()" style="font-size: 11px; padding: 6px; width: 48%;">🤝 共有フォルダ</button>
+                    </div>
+                    
                     <!-- Breadcrumb navigation -->
                     <div id="folder-breadcrumb" style="background: #f8f9fa; padding: 8px; border-radius: 5px; margin-bottom: 10px; font-size: 12px; min-height: 24px;">
                         <span id="breadcrumb-text">📁 My Drive</span>
@@ -198,6 +204,8 @@
         let currentFolderId = ''; // Current folder being viewed
         let folderHistory = []; // Navigation history
         let allFolders = []; // Cache of all folders
+        let sharedFolders = []; // Cache of shared folders
+        let currentDriveType = 'my'; // 'my' or 'shared'
 
         const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly';
 
@@ -448,6 +456,7 @@
                 // Automatically load folders when connected
                 setTimeout(() => {
                     debugLog('🔄 接続後自動フォルダ読み込み');
+                    updateDriveButtons(); // Initialize button states
                     loadFolders();
                 }, 1000);
             } else {
@@ -648,26 +657,200 @@
             // Add current folder to history
             folderHistory.push(currentFolderId);
             
-            // Load selected folder
-            loadFolders(selectedValue);
+            // Load selected folder based on current drive type
+            if (currentDriveType === 'my') {
+                loadFolders(selectedValue);
+            } else {
+                loadSharedFolders(selectedValue);
+            }
         }
 
         function goBackFolder() {
             if (folderHistory.length === 0) {
-                debugLog('📁 ルートフォルダに戻る');
-                loadFolders('');
+                debugLog(`📁 ルートに戻る (${currentDriveType === 'my' ? 'My Drive' : '共有フォルダ'})`);
+                if (currentDriveType === 'my') {
+                    loadFolders('');
+                } else {
+                    loadSharedFolders('');
+                }
                 return;
             }
             
             const previousFolder = folderHistory.pop();
             debugLog(`📁 前のフォルダに戻る: ${previousFolder || 'ルート'}`);
-            loadFolders(previousFolder);
+            
+            if (currentDriveType === 'my') {
+                loadFolders(previousFolder);
+            } else {
+                loadSharedFolders(previousFolder);
+            }
+        }
+
+        function switchToMyDrive() {
+            debugLog('📁 My Driveに切り替え');
+            currentDriveType = 'my';
+            currentFolderId = '';
+            folderHistory = [];
+            updateDriveButtons();
+            loadFolders('');
+        }
+
+        function switchToSharedDrive() {
+            debugLog('🤝 共有フォルダに切り替え');
+            currentDriveType = 'shared';
+            currentFolderId = '';
+            folderHistory = [];
+            updateDriveButtons();
+            loadSharedFolders('');
+        }
+
+        function updateDriveButtons() {
+            const myDriveBtn = document.getElementById('my-drive-btn');
+            const sharedDriveBtn = document.getElementById('shared-drive-btn');
+            
+            if (currentDriveType === 'my') {
+                myDriveBtn.style.background = '#007bff';
+                sharedDriveBtn.style.background = '#6c757d';
+            } else {
+                myDriveBtn.style.background = '#6c757d';
+                sharedDriveBtn.style.background = '#007bff';
+            }
+        }
+
+        async function loadSharedFolders(parentId = '') {
+            debugLog(`🤝 共有フォルダ一覧取得開始 (親: ${parentId || 'ルート'})`);
+            if (!accessToken) {
+                debugLog('❌ アクセストークンなし');
+                alert('Google Driveにアクセストークンがありません。再接続してください。');
+                return;
+            }
+
+            try {
+                debugLog(`🔑 使用中のアクセストークン: ${accessToken.substring(0, 20)}...`);
+                debugLog('🌐 Google Drive 共有フォルダAPI呼び出し');
+                
+                // Get shared folders
+                if (sharedFolders.length === 0) {
+                    const sharedResponse = await fetch('https://www.googleapis.com/drive/v3/files?q=mimeType="application/vnd.google-apps.folder" and sharedWithMe=true&pageSize=1000&fields=files(id,name,parents,mimeType,owners)', {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`
+                        }
+                    });
+
+                    if (sharedResponse.ok) {
+                        const sharedData = await sharedResponse.json();
+                        sharedFolders = (sharedData.files || []).filter(file => 
+                            file.mimeType === 'application/vnd.google-apps.folder'
+                        );
+                        debugLog(`✅ 共有フォルダキャッシュ: ${sharedFolders.length}個`);
+                        
+                        // Log shared folders with owner info
+                        sharedFolders.forEach((folder, index) => {
+                            const ownerName = folder.owners && folder.owners[0] ? folder.owners[0].displayName || folder.owners[0].emailAddress : '不明';
+                            debugLog(`🤝 ${index + 1}. ${folder.name} (所有者: ${ownerName})`);
+                        });
+                    }
+                }
+
+                // Filter shared folders for current level
+                const currentLevelFolders = sharedFolders.filter(folder => {
+                    if (parentId === '') {
+                        // Root level of shared: show all shared folders
+                        return true;
+                    } else {
+                        // Specific parent: folders with this parent (for navigation within shared folders)
+                        return folder.parents && folder.parents.includes(parentId);
+                    }
+                }).sort((a, b) => a.name.localeCompare(b.name));
+
+                debugLog(`🤝 現在階層の共有フォルダ: ${currentLevelFolders.length}個`);
+                
+                const select = document.getElementById('folder-select');
+                if (!select) {
+                    debugLog('❌ folder-select要素が見つかりません');
+                    return;
+                }
+                
+                // Update current folder context
+                currentFolderId = parentId;
+                selectedFolderId = parentId;
+                
+                // Update breadcrumb for shared folders
+                updateSharedBreadcrumb(parentId);
+                
+                // Clear and populate select
+                select.innerHTML = '<option value="">このフォルダに保存</option>';
+                
+                currentLevelFolders.forEach(folder => {
+                    const option = document.createElement('option');
+                    option.value = folder.id;
+                    const ownerName = folder.owners && folder.owners[0] ? folder.owners[0].displayName || folder.owners[0].emailAddress : '不明';
+                    option.textContent = `🤝 ${folder.name} (${ownerName})`;
+                    select.appendChild(option);
+                    debugLog(`➕ 共有フォルダオプション追加: ${folder.name} (所有者: ${ownerName})`);
+                });
+
+                debugLog(`📋 セレクトボックスのオプション数: ${select.options.length}`);
+
+                // Add change listener for folder navigation
+                select.onchange = function() {
+                    const enterBtn = document.getElementById('enter-folder-btn');
+                    if (this.value) {
+                        enterBtn.disabled = false;
+                        const folderName = this.options[this.selectedIndex].text.replace(/^🤝 /, '').split(' (')[0];
+                        enterBtn.textContent = `📂 ${folderName} を開く`;
+                    } else {
+                        enterBtn.disabled = true;
+                        enterBtn.textContent = '📂 フォルダを開く';
+                        selectedFolderId = currentFolderId;
+                    }
+                };
+
+                debugLog('✅ 共有フォルダ選択ボックス更新完了');
+
+            } catch (error) {
+                debugLog(`❌ 共有フォルダ取得失敗: ${error.message}`);
+                alert(`共有フォルダ取得エラー: ${error.message}`);
+            }
+        }
+
+        function updateSharedBreadcrumb(folderId) {
+            const breadcrumbText = document.getElementById('breadcrumb-text');
+            const backButton = document.getElementById('back-button');
+            
+            if (!folderId) {
+                breadcrumbText.textContent = '🤝 共有フォルダ';
+                backButton.style.display = 'none';
+                return;
+            }
+            
+            // Build breadcrumb path for shared folders
+            const path = [];
+            let currentId = folderId;
+            let depth = 0;
+            
+            while (currentId && depth < 10) {
+                const folder = sharedFolders.find(f => f.id === currentId);
+                if (!folder) break;
+                
+                path.unshift(folder.name);
+                currentId = folder.parents && folder.parents[0];
+                depth++;
+            }
+            
+            breadcrumbText.textContent = '🤝 共有フォルダ' + (path.length > 0 ? ' / ' + path.join(' / ') : '');
+            backButton.style.display = 'inline-block';
         }
 
         function refreshFolders() {
             debugLog('🔄 フォルダ更新');
             allFolders = []; // Clear cache
-            loadFolders(currentFolderId);
+            sharedFolders = []; // Clear shared cache
+            if (currentDriveType === 'my') {
+                loadFolders(currentFolderId);
+            } else {
+                loadSharedFolders(currentFolderId);
+            }
         }
 
         function debugFolderState() {
