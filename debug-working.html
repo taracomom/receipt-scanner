@@ -94,6 +94,7 @@
                 <button class="btn btn-primary" onclick="saveClientId()">保存</button>
             </div>
             <button id="connect-drive-btn" class="btn btn-primary" onclick="connectGoogleDrive()">🔗 Google Drive接続</button>
+            <button class="btn btn-danger" onclick="forceClearAuth()" style="margin-top: 5px; font-size: 12px; padding: 8px;">🗑️ 認証完全クリア</button>
             
             <div id="folder-selection" class="hidden" style="margin-top: 15px;">
                 <div class="form-group">
@@ -430,6 +431,35 @@
             accessToken = null;
             localStorage.removeItem('google_access_token');
             updateDriveStatus(false);
+        }
+
+        function forceClearAuth() {
+            debugLog('🗑️ 認証データ完全クリア開始');
+            
+            // Clear all Google-related data
+            accessToken = null;
+            selectedFolderId = '';
+            localStorage.removeItem('google_access_token');
+            localStorage.removeItem('selected_folder_id');
+            
+            // Reset UI
+            updateDriveStatus(false);
+            const select = document.getElementById('folder-select');
+            select.innerHTML = '<option value="">ルートフォルダ（My Drive）</option>';
+            
+            // Clear browser cache for Google OAuth (attempt)
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    registrations.forEach(registration => {
+                        if (registration.scope.includes('accounts.google.com')) {
+                            registration.unregister();
+                        }
+                    });
+                });
+            }
+            
+            debugLog('✅ 認証データ完全クリア完了');
+            alert('認証データを完全にクリアしました。\n新しい権限で再接続してください。');
         }
 
         async function loadFolders() {
