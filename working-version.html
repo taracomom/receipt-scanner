@@ -616,7 +616,7 @@
                 }
                 
                 document.getElementById('file-input').style.display = 'block';
-                document.getElementById('capture-btn').textContent = '📁 ファイルを選択して解析';
+                document.getElementById('capture-btn').textContent = '📁 ファイル選択して解析';
                 document.getElementById('capture-btn').disabled = false;
                 document.getElementById('capture-btn').onclick = () => document.getElementById('file-input').click();
                 
@@ -739,7 +739,6 @@
         function updateDriveStatus(connected) {
             driveConnected = connected;
             const statusEl = document.getElementById('drive-status');
-            const saveDriveBtn = document.getElementById('save-drive-btn');
             const connectBtn = document.getElementById('connect-drive-btn');
             
             if (connected) {
@@ -747,8 +746,6 @@
                 statusEl.innerHTML = '<strong>☁️ Google Drive:</strong> 接続済み';
                 connectBtn.textContent = '🔓 切断';
                 connectBtn.onclick = disconnectGoogleDrive;
-                saveDriveBtn.disabled = false;
-                document.getElementById('folder-selection').classList.remove('hidden');
                 debugLog('✅ Google Driveステータス: 接続済み');
                 
                 // Automatically load folders when connected
@@ -763,8 +760,6 @@
                 statusEl.innerHTML = '<strong>☁️ Google Drive:</strong> 未接続';
                 connectBtn.textContent = '🔗 Google Drive接続';
                 connectBtn.onclick = connectGoogleDrive;
-                saveDriveBtn.disabled = true;
-                document.getElementById('folder-selection').classList.add('hidden');
                 debugLog('⚠️ Google Driveステータス: 未接続');
             }
         }
@@ -782,13 +777,24 @@
             // Clear all Google-related data
             accessToken = null;
             selectedFolderId = '';
+            currentFolderId = '';
+            folderHistory = [];
+            allFolders = [];
+            sharedFolders = [];
             localStorage.removeItem('google_access_token');
             localStorage.removeItem('selected_folder_id');
+            localStorage.removeItem('remember_drive_type');
+            localStorage.removeItem('remember_folder_id');
+            localStorage.removeItem('remember_folder_name');
             
             // Reset UI
             updateDriveStatus(false);
             const select = document.getElementById('folder-select');
-            select.innerHTML = '<option value="">ルートフォルダ（My Drive）</option>';
+            select.innerHTML = '<option value="">このフォルダに保存</option>';
+            
+            // Reset folder indicator
+            const indicator = document.getElementById('current-folder-indicator');
+            indicator.classList.add('hidden');
             
             // Clear browser cache for Google OAuth (attempt)
             if ('serviceWorker' in navigator) {
@@ -1288,7 +1294,7 @@
                 
                 // Show file input as alternative
                 document.getElementById('file-input').style.display = 'block';
-                document.getElementById('capture-btn').textContent = '📁 ファイルを選択';
+                document.getElementById('capture-btn').textContent = '📁 ファイル選択';
                 document.getElementById('capture-btn').disabled = false;
                 document.getElementById('capture-btn').onclick = () => document.getElementById('file-input').click();
                 
