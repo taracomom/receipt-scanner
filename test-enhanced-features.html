@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Features Test - Receipt Scanner</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #007bff;
+        }
+        .test-result {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover { background: #0056b3; }
+        .btn:disabled { background: #6c757d; cursor: not-allowed; }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        #camera-test {
+            width: 100%;
+            max-width: 400px;
+            height: 300px;
+            background: #000;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>📱 Receipt Scanner - Enhanced Features Test</h1>
+    <p>このページは新しい機能モジュールのテスト用です。</p>
+
+    <!-- Module Loading Test -->
+    <div class="test-section">
+        <h2>🔧 Module Loading Test</h2>
+        <button class="btn" onclick="testModuleLoading()">Test Module Loading</button>
+        <div id="module-results"></div>
+    </div>
+
+    <!-- Security Utils Test -->
+    <div class="test-section">
+        <h2>🛡️ Security Utils Test</h2>
+        <button class="btn" onclick="testSecurityUtils()">Test Input Validation</button>
+        <div id="security-results"></div>
+    </div>
+
+    <!-- Camera Manager Test -->
+    <div class="test-section">
+        <h2>📷 Camera Manager Test</h2>
+        <video id="camera-test" autoplay muted playsinline></video>
+        <canvas id="test-canvas" style="display: none;"></canvas>
+        <br>
+        <button class="btn" onclick="testCameraInit()">Initialize Camera</button>
+        <button class="btn" onclick="testCameraSwitch()" disabled id="switch-btn">Switch Camera</button>
+        <button class="btn" onclick="testCapture()" disabled id="capture-btn">Capture Photo</button>
+        <div id="camera-results"></div>
+    </div>
+
+    <!-- Storage Manager Test -->
+    <div class="test-section">
+        <h2>💾 Storage Manager Test</h2>
+        <button class="btn" onclick="testStorageOperations()">Test Storage Operations</button>
+        <button class="btn" onclick="testOfflineMode()">Test Offline Mode</button>
+        <div id="storage-results"></div>
+    </div>
+
+    <!-- UI Manager Test -->
+    <div class="test-section">
+        <h2>🎨 UI Manager Test</h2>
+        <button class="btn" onclick="testUIFeatures()">Test UI Features</button>
+        <button class="btn" onclick="testNotifications()">Test Notifications</button>
+        <button class="btn" onclick="testLoadingStates()">Test Loading States</button>
+        <div id="ui-results"></div>
+    </div>
+
+    <!-- Image Processor Test -->
+    <div class="test-section">
+        <h2>🖼️ Image Processor Test</h2>
+        <input type="file" id="test-image" accept="image/*" onchange="testImageProcessing()">
+        <button class="btn" onclick="document.getElementById('test-image').click()">Select Test Image</button>
+        <div id="image-results"></div>
+    </div>
+
+    <!-- Configuration Test -->
+    <div class="test-section">
+        <h2>⚙️ Configuration Test</h2>
+        <button class="btn" onclick="testConfiguration()">Test Config Manager</button>
+        <div id="config-results"></div>
+    </div>
+
+    <!-- Error Handler Test -->
+    <div class="test-section">
+        <h2>❌ Error Handler Test</h2>
+        <button class="btn" onclick="testErrorHandling()">Test Error Scenarios</button>
+        <div id="error-results"></div>
+    </div>
+
+    <!-- Overall Integration Test -->
+    <div class="test-section">
+        <h2>🚀 Integration Test</h2>
+        <button class="btn" onclick="runFullIntegrationTest()">Run Full Integration Test</button>
+        <div id="integration-results"></div>
+    </div>
+
+    <!-- Load all modules -->
+    <script src="config.js"></script>
+    <script src="security-utils.js"></script>
+    <script src="error-handler.js"></script>
+    <script src="camera-manager.js"></script>
+    <script src="ui-manager.js"></script>
+    <script src="storage-manager.js"></script>
+    <script src="image-processor.js"></script>
+    <script src="integration-helper.js"></script>
+
+    <script>
+        let testCameraManager = null;
+        let testResults = {};
+
+        // Utility functions
+        function showResult(containerId, message, type = 'success') {
+            const container = document.getElementById(containerId);
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${type}`;
+            resultDiv.innerHTML = message;
+            container.appendChild(resultDiv);
+        }
+
+        function clearResults(containerId) {
+            document.getElementById(containerId).innerHTML = '';
+        }
+
+        // Test module loading
+        function testModuleLoading() {
+            clearResults('module-results');
+            
+            const modules = {
+                'SecurityUtils': typeof SecurityUtils,
+                'ERROR_HANDLER': typeof ERROR_HANDLER,
+                'CameraManager': typeof CameraManager,
+                'UI_MANAGER': typeof UI_MANAGER,
+                'STORAGE_MANAGER': typeof STORAGE_MANAGER,
+                'IMAGE_PROCESSOR': typeof IMAGE_PROCESSOR,
+                'CONFIG_MANAGER': typeof CONFIG_MANAGER,
+                'INTEGRATION_HELPER': typeof INTEGRATION_HELPER
+            };
+
+            let loadedCount = 0;
+            let totalCount = Object.keys(modules).length;
+
+            for (const [name, type] of Object.entries(modules)) {
+                if (type !== 'undefined') {
+                    showResult('module-results', `✅ ${name}: Loaded (${type})`, 'success');
+                    loadedCount++;
+                } else {
+                    showResult('module-results', `❌ ${name}: Not loaded`, 'error');
+                }
+            }
+
+            const percentage = Math.round((loadedCount / totalCount) * 100);
+            showResult('module-results', 
+                `📊 Module Loading: ${loadedCount}/${totalCount} (${percentage}%)`,
+                percentage === 100 ? 'success' : 'warning'
+            );
+
+            testResults.moduleLoading = { loaded: loadedCount, total: totalCount, percentage };
+        }
+
+        // Test security utils
+        function testSecurityUtils() {
+            clearResults('security-results');
+
+            if (typeof SecurityUtils === 'undefined') {
+                showResult('security-results', '❌ SecurityUtils not available', 'error');
+                return;
+            }
+
+            // Test API key validation
+            const apiKeyTests = [
+                { input: 'sk-test123456789012345678', expected: true },
+                { input: 'invalid-key', expected: false },
+                { input: '', expected: false }
+            ];
+
+            apiKeyTests.forEach((test, i) => {
+                const result = SecurityUtils.validateApiKey(test.input);
+                const passed = result.valid === test.expected;
+                showResult('security-results', 
+                    `API Key Test ${i + 1}: ${passed ? '✅ PASS' : '❌ FAIL'} - "${test.input}"`,
+                    passed ? 'success' : 'error'
+                );
+            });
+
+            // Test input sanitization
+            const sanitizeTest = SecurityUtils.sanitizeInput('<script>alert("xss")</script>test');
+            const isClean = !sanitizeTest.includes('<script>');
+            showResult('security-results', 
+                `Sanitization Test: ${isClean ? '✅ PASS' : '❌ FAIL'} - Cleaned: "${sanitizeTest}"`,
+                isClean ? 'success' : 'error'
+            );
+
+            testResults.security = { apiKeyTests: apiKeyTests.length, sanitization: isClean };
+        }
+
+        // Test camera initialization
+        async function testCameraInit() {
+            clearResults('camera-results');
+            
+            if (typeof CameraManager === 'undefined') {
+                showResult('camera-results', '❌ CameraManager not available', 'error');
+                return;
+            }
+
+            try {
+                const video = document.getElementById('camera-test');
+                const canvas = document.getElementById('test-canvas');
+                
+                testCameraManager = new CameraManager();
+                showResult('camera-results', '📷 Camera manager created', 'success');
+
+                const result = await testCameraManager.initialize(video, canvas);
+                
+                if (result.success) {
+                    showResult('camera-results', `✅ Camera initialized: ${result.camera}`, 'success');
+                    document.getElementById('switch-btn').disabled = false;
+                    document.getElementById('capture-btn').disabled = false;
+                } else {
+                    showResult('camera-results', `❌ Camera init failed: ${result.error}`, 'error');
+                }
+
+                testResults.camera = result;
+
+            } catch (error) {
+                showResult('camera-results', `❌ Camera test error: ${error.message}`, 'error');
+            }
+        }
+
+        // Test camera switch
+        async function testCameraSwitch() {
+            if (!testCameraManager) {
+                showResult('camera-results', '❌ Camera not initialized', 'error');
+                return;
+            }
+
+            try {
+                const result = await testCameraManager.switchCamera();
+                showResult('camera-results', 
+                    result.success ? 
+                    `✅ Camera switched to: ${result.camera}` : 
+                    `❌ Switch failed: ${result.error}`,
+                    result.success ? 'success' : 'error'
+                );
+            } catch (error) {
+                showResult('camera-results', `❌ Switch error: ${error.message}`, 'error');
+            }
+        }
+
+        // Test photo capture
+        async function testCapture() {
+            if (!testCameraManager) {
+                showResult('camera-results', '❌ Camera not initialized', 'error');
+                return;
+            }
+
+            try {
+                const result = await testCameraManager.capturePhoto();
+                showResult('camera-results', 
+                    `✅ Photo captured: ${result.width}x${result.height}, ${Math.round(result.size/1024)}KB`,
+                    'success'
+                );
+            } catch (error) {
+                showResult('camera-results', `❌ Capture error: ${error.message}`, 'error');
+            }
+        }
+
+        // Test storage operations
+        async function testStorageOperations() {
+            clearResults('storage-results');
+
+            if (typeof STORAGE_MANAGER === 'undefined') {
+                showResult('storage-results', '❌ STORAGE_MANAGER not available', 'error');
+                return;
+            }
+
+            try {
+                // Test saving a receipt
+                const testReceipt = {
+                    date: '2025-07-14',
+                    company: 'Test Store',
+                    item: 'Test Item',
+                    price: '100'
+                };
+
+                const savedReceipt = await STORAGE_MANAGER.saveReceipt(testReceipt);
+                showResult('storage-results', `✅ Receipt saved: ID ${savedReceipt.id}`, 'success');
+
+                // Test retrieving receipts
+                const receipts = await STORAGE_MANAGER.getReceipts();
+                showResult('storage-results', `✅ Retrieved ${receipts.length} receipts`, 'success');
+
+                // Test storage stats
+                const stats = await STORAGE_MANAGER.getStorageStats();
+                showResult('storage-results', 
+                    `📊 Storage stats: ${stats.totalReceipts} total, ${stats.syncedReceipts} synced`,
+                    'success'
+                );
+
+                testResults.storage = { receipts: receipts.length, stats };
+
+            } catch (error) {
+                showResult('storage-results', `❌ Storage test error: ${error.message}`, 'error');
+            }
+        }
+
+        // Test offline mode
+        function testOfflineMode() {
+            const isOnline = navigator.onLine;
+            showResult('storage-results', `📶 Current status: ${isOnline ? 'Online' : 'Offline'}`, 'success');
+            
+            if (typeof STORAGE_MANAGER !== 'undefined') {
+                showResult('storage-results', `💾 Storage manager available for offline operations`, 'success');
+            }
+        }
+
+        // Test UI features
+        function testUIFeatures() {
+            clearResults('ui-results');
+
+            if (typeof UI_MANAGER === 'undefined') {
+                showResult('ui-results', '❌ UI_MANAGER not available', 'error');
+                return;
+            }
+
+            showResult('ui-results', '✅ UI Manager available', 'success');
+            showResult('ui-results', '🎨 Testing UI features (check notifications and loading)', 'success');
+        }
+
+        // Test notifications
+        function testNotifications() {
+            if (typeof UI_MANAGER === 'undefined') return;
+
+            UI_MANAGER.showNotification('これは成功通知のテストです', 'success');
+            setTimeout(() => {
+                UI_MANAGER.showNotification('これは警告通知のテストです', 'warning');
+            }, 1000);
+            setTimeout(() => {
+                UI_MANAGER.showNotification('これはエラー通知のテストです', 'error');
+            }, 2000);
+
+            showResult('ui-results', '✅ Notification tests triggered', 'success');
+        }
+
+        // Test loading states
+        function testLoadingStates() {
+            if (typeof UI_MANAGER === 'undefined') return;
+
+            UI_MANAGER.showLoading('テスト処理中...', 0);
+            
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 20;
+                UI_MANAGER.updateProgress(progress, `処理中... ${progress}%`);
+                
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        UI_MANAGER.hideLoading();
+                        showResult('ui-results', '✅ Loading state test completed', 'success');
+                    }, 1000);
+                }
+            }, 500);
+        }
+
+        // Test image processing
+        async function testImageProcessing() {
+            clearResults('image-results');
+
+            const file = document.getElementById('test-image').files[0];
+            if (!file) {
+                showResult('image-results', '❌ No image selected', 'error');
+                return;
+            }
+
+            if (typeof IMAGE_PROCESSOR === 'undefined') {
+                showResult('image-results', '❌ IMAGE_PROCESSOR not available', 'error');
+                return;
+            }
+
+            try {
+                showResult('image-results', `📁 Processing: ${file.name} (${Math.round(file.size/1024)}KB)`, 'success');
+
+                const result = await IMAGE_PROCESSOR.processImage(file, {
+                    maxDimension: 800,
+                    quality: 0.7,
+                    enhance: true
+                });
+
+                showResult('image-results', 
+                    `✅ Processed: ${Math.round(result.processedSize/1024)}KB ` +
+                    `(${Math.round(result.compressionRatio * 100)}% of original)`,
+                    'success'
+                );
+
+                testResults.imageProcessing = result;
+
+            } catch (error) {
+                showResult('image-results', `❌ Processing error: ${error.message}`, 'error');
+            }
+        }
+
+        // Test configuration
+        async function testConfiguration() {
+            clearResults('config-results');
+
+            if (typeof CONFIG_MANAGER === 'undefined') {
+                showResult('config-results', '❌ CONFIG_MANAGER not available', 'error');
+                return;
+            }
+
+            try {
+                await CONFIG_MANAGER.initialize();
+                showResult('config-results', '✅ Config manager initialized', 'success');
+
+                const debugMode = CONFIG_MANAGER.get('DEBUG_MODE');
+                showResult('config-results', `⚙️ Debug mode: ${debugMode}`, 'success');
+
+                testResults.configuration = { initialized: true, debugMode };
+
+            } catch (error) {
+                showResult('config-results', `❌ Config test error: ${error.message}`, 'error');
+            }
+        }
+
+        // Test error handling
+        function testErrorHandling() {
+            clearResults('error-results');
+
+            if (typeof ERROR_HANDLER === 'undefined') {
+                showResult('error-results', '❌ ERROR_HANDLER not available', 'error');
+                return;
+            }
+
+            // Test different error types
+            ERROR_HANDLER.handleError('TEST_ERROR', {
+                message: 'This is a test error',
+                testId: 'error-test-1'
+            });
+
+            showResult('error-results', '✅ Error handler test triggered', 'success');
+            showResult('error-results', '📋 Check console and notifications for error handling', 'success');
+
+            testResults.errorHandling = { tested: true };
+        }
+
+        // Run full integration test
+        async function runFullIntegrationTest() {
+            clearResults('integration-results');
+            showResult('integration-results', '🚀 Starting full integration test...', 'success');
+
+            // Test all modules in sequence
+            testModuleLoading();
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            testSecurityUtils();
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            await testStorageOperations();
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            await testConfiguration();
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            testErrorHandling();
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Generate test report
+            const report = {
+                timestamp: new Date().toISOString(),
+                results: testResults,
+                summary: {
+                    modulesLoaded: testResults.moduleLoading?.percentage || 0,
+                    securityPassed: testResults.security ? true : false,
+                    storageFunctional: testResults.storage ? true : false,
+                    configFunctional: testResults.configuration?.initialized || false
+                }
+            };
+
+            showResult('integration-results', 
+                `📊 Integration test completed. See console for detailed report.`, 
+                'success'
+            );
+
+            console.log('🎯 Integration Test Report:', report);
+        }
+
+        // Auto-run module loading test on page load
+        window.addEventListener('load', () => {
+            setTimeout(testModuleLoading, 1000);
+        });
+    </script>
+</body>
+</html>

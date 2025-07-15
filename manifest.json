@@ -2,7 +2,7 @@
   "name": "Receipt Scanner",
   "short_name": "ReceiptScan",
   "description": "レシートをスキャンして自動保存するPWAアプリ",
-  "start_url": "/receipt-scanner/simple-test.html",
+  "start_url": "/receipt-scanner/working-version.html",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#007bff",

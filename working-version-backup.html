@@ -370,7 +370,7 @@
                 </div>
                 <div class="form-group">
                     <label>Google Client ID</label>
-                    <input type="text" id="google-client-id" placeholder="123456789-abcd.apps.googleusercontent.com" value="">
+                    <input type="text" id="google-client-id" placeholder="123456789-abcd.apps.googleusercontent.com" value="255333114465-961rhoiiscu1iu72f1m5blege4ks9ijk.apps.googleusercontent.com">
                     <button class="btn btn-primary" onclick="saveClientId()">保存</button>
                 </div>
                 <button id="connect-drive-btn" class="btn btn-primary" onclick="connectGoogleDrive()">🔗 Google Drive接続</button>
@@ -439,23 +439,9 @@
 
     <!-- Google APIs -->
     <script src="https://accounts.google.com/gsi/client"></script>
-    
-    <!-- Security and Configuration Modules -->
-    <script src="config.js"></script>
-    <script src="security-utils.js"></script>
-    <script src="error-handler.js"></script>
-    
-    <!-- Enhanced Feature Modules -->
-    <script src="camera-manager.js"></script>
-    <script src="ui-manager.js"></script>
-    <script src="storage-manager.js"></script>
-    <script src="image-processor.js"></script>
-    <script src="integration-helper.js"></script>
 
     <script>
-        // Global variables and managers
         let video, canvas, capturedImage;
-        let cameraManager = null;
         let cameraAvailable = false;
         let openaiConfigured = false;
         let driveConnected = false;
@@ -472,46 +458,6 @@
         let sharedFolders = []; // Cache of shared folders
         let currentDriveType = 'my'; // 'my' or 'shared'
         let currentFacingMode = 'environment'; // 'environment' or 'user'
-        
-        // Initialize enhanced modules when DOM is ready
-        document.addEventListener('DOMContentLoaded', async function() {
-            debugLog('🚀 アプリケーション初期化開始');
-            
-            try {
-                // Initialize configuration manager
-                await CONFIG_MANAGER.initialize();
-                debugLog('✅ 設定マネージャー初期化完了');
-                
-                // Initialize camera manager
-                video = document.getElementById('video');
-                canvas = document.getElementById('canvas');
-                cameraManager = new CameraManager();
-                
-                // Setup camera event listeners
-                document.addEventListener('camera-ready', () => {
-                    debugLog('📷 カメラ準備完了');
-                    cameraAvailable = true;
-                    updateCameraStatus(true);
-                    updateMainStatus();
-                });
-                
-                document.addEventListener('camera-error', (event) => {
-                    debugLog(`❌ カメラエラー: ${event.detail.error}`);
-                    cameraAvailable = false;
-                    updateCameraStatus(false);
-                    updateMainStatus();
-                });
-                
-                // Load saved settings
-                loadSavedSettings();
-                
-                debugLog('✅ アプリケーション初期化完了');
-                
-            } catch (error) {
-                debugLog(`❌ 初期化エラー: ${error.message}`);
-                ERROR_HANDLER.handleError('INIT_ERROR', { message: error.message });
-            }
-        });
 
         const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly';
 
@@ -731,43 +677,35 @@
 
         function saveOpenAIKey() {
             debugLog('🔑 OpenAI APIキー保存開始');
-            const apiKey = document.getElementById('openai-api-key').value;
+            const apiKey = document.getElementById('openai-api-key').value.trim();
             
-            // Use SecurityUtils for validation
-            const validation = SecurityUtils.validateApiKey(apiKey);
-            if (!validation.valid) {
-                debugLog(`❌ APIキー検証エラー: ${validation.error}`);
-                ERROR_HANDLER.handleError('VALIDATION_ERROR', { message: validation.error });
+            if (!apiKey) {
+                debugLog('❌ APIキーが空です');
+                alert('OpenAI API キーを入力してください');
                 return;
             }
 
-            // Use secure storage
-            try {
-                CONFIG_MANAGER.set('OPENAI_API_KEY', validation.sanitized);
-                localStorage.setItem('openai_api_key', validation.sanitized);
-                updateOpenAIStatus(true);
-                updateMainStatus();
-                debugLog(`✅ APIキー保存完了 (${validation.sanitized.length}文字)`);
-                ERROR_HANDLER.showUserMessage('OpenAI API キーを保存しました', 'success');
-            } catch (error) {
-                debugLog(`❌ APIキー保存エラー: ${error.message}`);
-                ERROR_HANDLER.handleError('STORAGE_ERROR', { message: error.message });
+            if (!apiKey.startsWith('sk-')) {
+                debugLog('❌ APIキー形式が無効です');
+                alert('正しいOpenAI API キー形式ではありません（sk-で始まる必要があります）');
+                return;
             }
+
+            localStorage.setItem('openai_api_key', apiKey);
+            updateOpenAIStatus(true);
+            updateMainStatus();
+            debugLog(`✅ APIキー保存完了 (${apiKey.length}文字)`);
+            alert('OpenAI API キーを保存しました');
         }
 
         function saveClientId() {
             debugLog('🔑 Google Client ID保存開始');
-            const clientId = document.getElementById('google-client-id').value;
-            
-            // Use SecurityUtils for validation
-            const validation = SecurityUtils.validateClientId(clientId);
-            if (!validation.valid) {
-                debugLog(`❌ Client ID検証エラー: ${validation.error}`);
-                ERROR_HANDLER.handleError('VALIDATION_ERROR', { message: validation.error });
+            const clientId = document.getElementById('google-client-id').value.trim();
+            if (!clientId) {
+                debugLog('❌ Client IDが空です');
+                alert('Google Client IDを入力してください');
                 return;
             }
-
-            try {
 
             localStorage.setItem('google_client_id', clientId);
             debugLog('✅ Google Client ID保存完了');
@@ -1369,13 +1307,9 @@
             
             // Toggle facing mode
             const newFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
-            debugLog('🔄 カメラ切り替え: ' + currentFacingMode + ' から ' + newFacingMode + ' へ');
+            debugLog(`🔄 カメラ切り替え: ${currentFacingMode} → ${newFacingMode}`);
             
-            if (newFacingMode === 'environment') {
-                overlay.textContent = 'リアカメラに切り替え中...';
-            } else {
-                overlay.textContent = 'フロントカメラに切り替え中...';
-            }
+            overlay.textContent = `${newFacingMode === 'environment' ? 'リア' : 'フロント'}カメラに切り替え中...`;
             
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
